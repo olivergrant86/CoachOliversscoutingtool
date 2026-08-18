@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Duncan Demon Diamond Analytics</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="storageWarning" style="display:none;background:#fdecea;color:#8a2c22;padding:10px 20px;font-size:.9rem;border-bottom:1px solid #f3b9b0;"></div>
+
+<!-- AUTH GATE: shown until someone is signed in -->
+<div id="authGate" style="max-width:380px;margin:80px auto;padding:30px;border:1px solid var(--border);border-radius:10px;background:#fff;">
+  <h2 style="margin-top:0;">Duncan Demon Diamond Analytics</h2>
+  <p class="hint">Sign in to access your data from any device.</p>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="email" />
+    <input type="password" id="authPassword" placeholder="Password (6+ characters)" autocomplete="current-password" />
+  </div>
+  <div class="row" style="margin-top:14px;">
+    <button id="btnAuthSignIn" class="btn primary">Log In</button>
+    <button id="btnAuthSignUp" class="btn">Sign Up</button>
+  </div>
+  <p style="margin-top:10px;"><a href="#" id="linkForgotPassword" style="font-size:.85rem;">Forgot password?</a></p>
+  <p id="authMsg" class="msg" style="margin-top:10px;"></p>
+</div>
+
+<div id="resetPasswordGate" style="display:none;max-width:380px;margin:80px auto;padding:30px;border:1px solid var(--border);border-radius:10px;background:#fff;">
+  <h2 style="margin-top:0;">Set a new password</h2>
+  <p class="hint">Enter a new password for your account.</p>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
+    <input type="password" id="newPassword" placeholder="New password (6+ characters)" autocomplete="new-password" />
+  </div>
+  <div class="row" style="margin-top:14px;">
+    <button id="btnSetNewPassword" class="btn primary">Set New Password</button>
+  </div>
+  <p id="resetMsg" class="msg" style="margin-top:10px;"></p>
+</div>
+
+<div id="pendingApproval" style="display:none;max-width:420px;margin:80px auto;padding:30px;border:1px solid var(--border);border-radius:10px;background:#fff;text-align:center;">
+  <h2 style="margin-top:0;">Account pending approval</h2>
+  <p class="hint">Your account (<strong id="pendingEmailLabel"></strong>) has been created, but a coach needs to approve it before you can use the app. Check back later, or reach out to your coach directly.</p>
+  <button id="btnPendingSignOut" class="btn" style="margin-top:10px;">Log Out</button>
+</div>
+
+<div id="appRoot" style="display:none;">
+
+
+<header class="topbar">
+  <div class="brand">
+    <img src="img/logo.png" alt="Duncan Demons logo" class="brand-logo"
+         onerror="this.style.display='none';" />
+    Duncan Demon Diamond Analytics
+  </div>
+  <div class="opponent-select">
+    <span id="currentUserLabel" style="color:#cfd9e2;font-size:.85rem;margin-right:10px;"></span>
+    <button id="btnAuthSignOut" class="btn small">Log Out</button>
+    <label for="opponentPicker">Opponent</label>
+    <select id="opponentPicker"><option value="">— none —</option></select>
+    <button id="btnAddOpponent" class="btn small">+ Add</button>
+    <button id="btnEditOpponent" class="btn small">Edit</button>
+    <button id="btnDeleteOpponent" class="btn small danger">Delete</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="gclog">Import Game Log</button>
+</nav>
+
+<main>
+
+  <!-- IMPORT GAME LOG TAB -->
+  <section id="tab-gclog" class="tab-panel active">
+    <h2>Import Game Log</h2>
+    <p class="hint">
+      <strong>Grant's Basic Instructions:</strong><br />
+      Top right add an opponent/season. After you hit add make sure that is selected and then
+      you can start importing. When you import take the gamechanger play by play and paste it
+      into the game log box. You do not have to put the team names in there but I would highly
+      suggest putting the home and visitor team names in the box just so their are no
+      mismatched names if someone spelled something wrong in their Gamechanger. After this just
+      click the Parse and Add to season button and let the tool do its magic.
+    </p>
+    <div class="inline-form" style="align-items:flex-start;">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label for="gcHomeTeamInput" style="font-weight:700;font-size:.8rem;letter-spacing:.03em;">HOME</label>
+        <input type="text" id="gcHomeTeamInput" placeholder="Home team name (auto-detected if blank)" style="min-width:260px" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label for="gcVisitorTeamInput" style="font-weight:700;font-size:.8rem;letter-spacing:.03em;">VISITOR</label>
+        <input type="text" id="gcVisitorTeamInput" placeholder="Visitor team name (auto-detected if blank)" style="min-width:260px" />
+      </div>
+    </div>
+    <textarea id="gcInput" rows="8" placeholder="Paste a full game log here… (separate multiple games with a line containing just ===)"></textarea>
+    <div class="row">
+      <button id="btnParseGcLog" class="btn primary">Parse &amp; Add to Season</button>
+      <button id="btnUndoLastGcGame" class="btn">Undo Last Game</button>
+      <span id="gcMsg" class="msg"></span>
+    </div>
+    <h3>Games Imported This Season</h3>
+    <div class="scroll-table">
+      <table class="data-table" id="gcGamesTable">
+        <thead><tr><th>#</th><th>Date imported</th><th>Home Team</th><th>Visitor Team</th><th>Plate appearances</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="snapshot" id="gcTeamSnapshot"></div>
+
+    <div class="row">
+      <label for="gcTeamFilter" style="font-size:.9rem;color:var(--muted);">Team:</label>
+      <select id="gcTeamFilter"><option value="">All Teams</option></select>
+    </div>
+
+    <div class="report-tabs">
+      <button class="gctab-btn active" data-gctab="summary">Season Summary</button>
+      <button class="gctab-btn" data-gctab="damage">Damage Report</button>
+      <button class="gctab-btn" data-gctab="spray">Spray Chart</button>
+      <button class="gctab-btn" data-gctab="card">Player Card</button>
+      <button class="gctab-btn" data-gctab="swingdec">Swing Decisions</button>
+      <button class="gctab-btn" data-gctab="pitching">Pitching Scout Report</button>
+      <button class="gctab-btn" data-gctab="tendencies">Team Tendencies</button>
+    </div>
+
+    <div id="gctab-summary" class="rtab-panel active">
+      <div class="row">
+        <button id="btnExportGcCsv" class="btn small">Export CSV</button>
+        <button id="btnPrintSeasonSummary" class="btn small">Print to PDF</button>
+      </div>
+      <div id="gcHitterSummaryHolder"></div>
+    </div>
+
+    <div id="gctab-damage" class="rtab-panel">
+      <div class="row"><button id="btnPrintDamage" class="btn small">Print to PDF</button></div>
+      <div id="gcDamageHolder">
+        <table class="data-table" id="gcDamageTable">
+          <thead><tr>
+            <th>Player</th><th>Team</th><th>2B</th><th>3B</th><th>HR</th><th>XBH</th>
+            <th>P</th><th>1B</th><th>2B</th><th>3B</th><th>SS</th><th>LF</th><th>CF</th><th>RF</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="gctab-spray" class="rtab-panel">
+      <div class="row">
+        <button id="btnTop9Spray" class="btn small">Top 9</button>
+        <button id="btnPrintSpray" class="btn small">Print to PDF</button>
+      </div>
+      <p class="hint">Select a player to see their individual spray chart, or view everyone at once.</p>
+      <select id="gcSprayPlayerPicker"><option value="">All Players</option></select>
+      <div id="gcSprayChartHolder"></div>
+    </div>
+
+    <div id="gctab-card" class="rtab-panel">
+      <div class="row"><button id="btnPrintCard" class="btn small">Print to PDF</button></div>
+      <select id="gcPlayerCardPicker"><option value="">Select a player…</option></select>
+      <span style="margin-left:10px;">
+        <button id="btnPdpStandard" class="btn small" style="font-weight:700;">Standard Card</button>
+        <button id="btnPdpDev" class="btn small">Development Plan</button>
+        <button id="btnPdpDefense" class="btn small">Defensive Statistics</button>
+      </span>
+      <div id="gcPlayerCardHolder"></div>
+    </div>
+
+    <div id="gctab-swingdec" class="rtab-panel">
+      <div class="row"><button id="btnPrintSwingDec" class="btn small">Print to PDF</button></div>
+      <div class="row">
+        <label for="gcSwingDecPicker" style="font-size:.9rem;color:var(--muted);">Individual player table:</label>
+        <select id="gcSwingDecPicker"><option value="">— none —</option></select>
+      </div>
+      <div id="gcSwingDecHolder"></div>
+    </div>
+
+    <div id="gctab-pitching" class="rtab-panel">
+      <div class="row"><button id="btnPrintPitching" class="btn small">Print to PDF</button></div>
+      <div id="gcPitchingReportHolder"></div>
+    </div>
+
+    <div id="gctab-tendencies" class="rtab-panel">
+      <div class="row"><button id="btnPrintTendencies" class="btn small">Print to PDF</button></div>
+      <div id="gcTendenciesHolder"></div>
+    </div>
+
+    <div class="row">
+      <button id="btnPrintGcReport" class="btn">Print / Save PDF</button>
+    </div>
+  </section>
+
+</main>
+
+</div><!-- /#appRoot -->
+
+<footer>Duncan Demon Diamond Analytics — your data is stored securely under your account, accessible from any device you sign into.</footer>
+
+<script>
+  window.addEventListener("error", (e) => {
+    const el = document.getElementById("storageWarning");
+    if (el) {
+      el.style.display = "block";
+      el.style.background = "#fdecea";
+      el.innerHTML = "⚠️ Something went wrong: <code>" + (e.message || "unknown error") +
+        "</code> — open the browser console (F12) for details.";
+    }
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/gamelog-parser.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/app.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>
