@@ -200,6 +200,53 @@ function gcComputeRecentSplit(opp, team, n = 5) {
   };
 }
 
+// The top N players on a team by season-total plate appearances — used to decide
+// who gets a line on the player-trend chart, so it's not cluttered with everyone
+// who's had one at-bat all season.
+function gcTopPlayersByPA(opp, team, n) {
+  const games = gcRelevantGamesSorted(opp, team);
+  const events = games.flatMap(g => g.events || []);
+  const totals = aggregateGameLogStats(events, [], []);
+  return Object.values(totals)
+    .filter(t => t.team === team)
+    .sort((a, b) => b.PA - a.PA)
+    .slice(0, n)
+    .map(t => t.name);
+}
+
+// For each given player, their CUMULATIVE (season-to-date) value of the given batting
+// stat after each of the team's games in order — a running total through each game,
+// not that single game's own number. A single game's average is too noisy to plot
+// meaningfully (an 0-for-2 game alone reads as ".000"); cumulative is what actually
+// shows a real trajectory. A player's line stays flat across any game they didn't
+// have a plate appearance in, since their season total didn't change.
+function gcComputePlayerTrendSeries(opp, team, statKey, playerNames) {
+  const games = gcRelevantGamesSorted(opp, team);
+  const running = {};
+  playerNames.forEach(name => { running[name] = { PA: 0, AB: 0, H: 0, "1B": 0, "2B": 0, "3B": 0, HR: 0, BB: 0, HBP: 0 }; });
+
+  const labels = [];
+  const valuesByPlayer = {};
+  playerNames.forEach(name => { valuesByPlayer[name] = []; });
+
+  games.forEach(g => {
+    labels.push(g.gameDate || (g.processedAt ? g.processedAt.slice(0, 10) : ""));
+    const gameTotals = aggregateGameLogStats(g.events || [], g.steals || [], g.scores || []);
+    playerNames.forEach(name => {
+      const gt = gameTotals[name];
+      const r = running[name];
+      if (gt) {
+        r.PA += gt.PA; r.AB += gt.AB; r.H += gt.H;
+        r["1B"] += gt["1B"]; r["2B"] += gt["2B"]; r["3B"] += gt["3B"]; r.HR += gt.HR;
+        r.BB += gt.BB; r.HBP += gt.HBP;
+      }
+      valuesByPlayer[name].push(computeBattingMetrics(r)[statKey]);
+    });
+  });
+
+  return { labels, series: playerNames.map(name => ({ name, values: valuesByPlayer[name] })) };
+}
+
 el("btnParseGcLog").addEventListener("click", () => {
   const opp = currentOpponent();
   if (!opp) { alert("Select or add an opponent first (top right)."); return; }
@@ -371,6 +418,7 @@ function renderGcGamesTable() {
 
 let lastGcTotalsArray = [];
 let gcCardViewMode = "standard"; // "standard" | "dev" — Player Card view toggle
+let gcTrendsViewMode = "team"; // "team" | "players" — Performance Trends view toggle
 
 function renderGcTeamSnapshot(totalsArray) {
   const sum = key => totalsArray.reduce((a, t) => a + (t[key] || 0), 0);
@@ -530,7 +578,27 @@ function renderGcReports() {
 
     const halfSplit = gcComputeHalfSplit(opp, selectedTeam);
     const recentSplit = gcComputeRecentSplit(opp, selectedTeam, 5);
-    trendsHolder.innerHTML = renderPerformanceTrends(selectedTeam, halfSplit, recentSplit);
+
+    const btnTrendsTeam = el("btnTrendsTeam"), btnTrendsPlayers = el("btnTrendsPlayers"), statPicker = el("gcTrendsStatPicker");
+    const statLabels = { avg: "AVG", obp: "OBP", slg: "SLG", ops: "OPS" };
+
+    function renderTrendsContent() {
+      if (gcTrendsViewMode === "players") {
+        statPicker.style.display = "";
+        const topPlayers = gcTopPlayersByPA(opp, selectedTeam, 6);
+        const { labels, series } = gcComputePlayerTrendSeries(opp, selectedTeam, statPicker.value, topPlayers);
+        trendsHolder.innerHTML = renderPlayerTrendsPanel(selectedTeam, labels, series, statPicker.value, statLabels[statPicker.value]);
+      } else {
+        statPicker.style.display = "none";
+        trendsHolder.innerHTML = renderPerformanceTrends(selectedTeam, halfSplit, recentSplit);
+      }
+      btnTrendsTeam.style.fontWeight = gcTrendsViewMode === "players" ? "400" : "700";
+      btnTrendsPlayers.style.fontWeight = gcTrendsViewMode === "players" ? "700" : "400";
+    }
+    btnTrendsTeam.onclick = () => { gcTrendsViewMode = "team"; renderTrendsContent(); };
+    btnTrendsPlayers.onclick = () => { gcTrendsViewMode = "players"; renderTrendsContent(); };
+    statPicker.onchange = renderTrendsContent;
+    renderTrendsContent();
   }
 
   teamFilter.onchange = renderGcReports;
