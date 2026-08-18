@@ -1447,6 +1447,102 @@ function computeTeamCurrentPerformance(totalsArray) {
   };
 }
 
+// Team-wide pitching slash line, matching computeTeamCurrentPerformance's batting shape.
+function computeTeamPitchingSummary(pitchingTotals) {
+  const pitchers = Object.values(pitchingTotals || {});
+  const sum = key => pitchers.reduce((a, p) => a + (p[key] || 0), 0);
+  const outs = sum("outs"), h = sum("H"), er = sum("ER"), bb = sum("BB"), k = sum("K");
+  return {
+    era: outs ? (er * 21) / outs : 0,
+    whip: outs ? (h + bb) / (outs / 3) : 0,
+    k7: outs ? (k * 21) / outs : 0,
+    bb7: outs ? (bb * 21) / outs : 0,
+    outs,
+  };
+}
+
+/* ---------- Performance Trends ----------
+ * Two comparisons, both using real game dates now that they're tracked:
+ * the team's first half of the season vs its second half, and its most
+ * recent games vs the full season. Both are genuinely small samples for a
+ * HS/travel team's game count, especially "recent" — shown as a direct
+ * side-by-side with an up/down indicator rather than a confident verdict,
+ * since a handful of games swinging one way is easy to over-read.
+ */
+
+function trendArrow(before, after, higherIsBetter) {
+  if (before === after) return `<span style="color:var(--muted);">–</span>`;
+  const improved = higherIsBetter ? after > before : after < before;
+  return improved
+    ? `<span style="color:#2e8b57;font-weight:700;">▲</span>`
+    : `<span style="color:var(--danger);font-weight:700;">▼</span>`;
+}
+
+function trendRow(label, before, after, fmt, higherIsBetter) {
+  return `<tr>
+    <td style="text-align:left;font-weight:700;">${label}</td>
+    <td>${fmt(before)}</td>
+    <td>${fmt(after)}</td>
+    <td>${trendArrow(before, after, higherIsBetter)}</td>
+  </tr>`;
+}
+
+function renderTrendTable(title, beforeLabel, afterLabel, before, after, subtitle) {
+  const avgFmt = v => v.toFixed(3).replace(/^0/, "");
+  const rows = [
+    trendRow("AVG", before.batting.avg, after.batting.avg, avgFmt, true),
+    trendRow("OBP", before.batting.obp, after.batting.obp, avgFmt, true),
+    trendRow("SLG", before.batting.slg, after.batting.slg, avgFmt, true),
+    trendRow("OPS", before.batting.ops, after.batting.ops, v => v.toFixed(3).replace(/^0/, ""), true),
+    trendRow("ERA", before.pitching.era, after.pitching.era, v => v.toFixed(2), false),
+    trendRow("WHIP", before.pitching.whip, after.pitching.whip, v => v.toFixed(2), false),
+    trendRow("K/7", before.pitching.k7, after.pitching.k7, v => v.toFixed(1), true),
+    trendRow("BB/7", before.pitching.bb7, after.pitching.bb7, v => v.toFixed(1), false),
+  ].join("");
+
+  return `
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;">
+      <div style="background:var(--navy);color:#fff;padding:8px 14px;">
+        <div style="font-weight:700;">${title}</div>
+        <div style="font-size:.72rem;color:#cfd9e2;">${subtitle}</div>
+      </div>
+      <table class="data-table" style="margin-top:0;">
+        <thead><tr><th style="text-align:left;">Stat</th><th>${beforeLabel}</th><th>${afterLabel}</th><th>Trend</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderPerformanceTrends(teamLabel, halfSplit, recentSplit) {
+  if (!halfSplit || halfSplit.before.gameCount === 0) {
+    return `<p class="hint">No games with tracked at-bats yet for ${teamLabel}.</p>`;
+  }
+
+  const halfTable = halfSplit.before.gameCount >= 1 && halfSplit.after.gameCount >= 1
+    ? renderTrendTable(
+        "First Half vs. Second Half", "1ST HALF", "2ND HALF", halfSplit.before, halfSplit.after,
+        `${halfSplit.before.gameCount} game(s) → ${halfSplit.after.gameCount} game(s), split by date`)
+    : `<p class="hint">Need at least 2 games to split into halves — only ${halfSplit.before.gameCount + halfSplit.after.gameCount} recorded so far.</p>`;
+
+  const recentTable = recentSplit && recentSplit.after.gameCount > 0
+    ? renderTrendTable(
+        "Season vs. Most Recent Games", "FULL SEASON", `LAST ${recentSplit.after.gameCount}`, recentSplit.before, recentSplit.after,
+        `${recentSplit.before.gameCount} game(s) total`)
+    : "";
+
+  return `
+    <div>
+      <h2 style="margin:0 0 12px;">${teamLabel}</h2>
+      ${halfTable}
+      ${recentTable}
+      <p class="hint" style="margin-top:4px;">
+        Both splits use game dates you've entered — a guessed or missing date can put a game in the wrong half or drop it from
+        the "recent" group. These are small samples, especially "recent games" — treat a swing in either direction as worth
+        watching, not as a confirmed trend.
+      </p>
+    </div>`;
+}
+
 function computeTopPerformers(totalsArray, n = 5, minPA = 10) {
   return totalsArray
     .filter(t => t.PA >= minPA && t.AB > 0)

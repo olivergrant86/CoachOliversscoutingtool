@@ -139,6 +139,67 @@ function gcAllPickedOff(opp) {
   return (opp.gameLogs || []).flatMap(g => g.pickedOff || []);
 }
 
+// A single comparable "YYYY-MM-DD"-ish key per game: the entered/detected game date
+// if there is one, otherwise the date portion of when it was imported (best available
+// fallback, consistent with how the games table itself sorts).
+function gcGameSortKey(g) {
+  return g.gameDate || (g.processedAt ? g.processedAt.slice(0, 10) : "0000-00-00");
+}
+
+// This team's games, oldest first.
+function gcRelevantGamesSorted(opp, team) {
+  return (opp.gameLogs || [])
+    .filter(g => g.homeTeamName === team || g.visitorTeamName === team)
+    .slice()
+    .sort((a, b) => gcGameSortKey(a).localeCompare(gcGameSortKey(b)));
+}
+
+// Full batting + pitching summary for an arbitrary subset of a team's games —
+// used to build the First Half/Second Half and Season/Recent comparisons.
+function gcAggregateGamesSubset(games, team) {
+  const events = games.flatMap(g => g.events || []);
+  const steals = games.flatMap(g => g.steals || []);
+  const scores = games.flatMap(g => g.scores || []);
+  const fieldingErrors = games.flatMap(g => g.fieldingErrors || []);
+  const fieldingPutouts = games.flatMap(g => g.fieldingPutouts || []);
+  const pickedOff = games.flatMap(g => g.pickedOff || []);
+  const outsLog = games.flatMap(g => g.outsLog || []).filter(o => o.team === team);
+  const wildPitches = games.flatMap(g => g.wildPitches || []).filter(w => w.team === team);
+
+  const totals = aggregateGameLogStats(events, steals, scores, fieldingErrors, pickedOff, fieldingPutouts);
+  const totalsArray = Object.values(totals).filter(t => t.team === team);
+
+  const teamPitchEvents = events.filter(e => e.pitcherTeam === team);
+  const teamPitchScores = scores.filter(s => s.pitcherTeam === team);
+  const teamSteals = steals.filter(s => s.pitcherTeam === team);
+  const pitchingTotals = aggregatePitchingStats(teamPitchEvents, teamPitchScores, outsLog, wildPitches, teamSteals);
+
+  return {
+    batting: computeTeamCurrentPerformance(totalsArray),
+    pitching: computeTeamPitchingSummary(pitchingTotals),
+    gameCount: games.length,
+  };
+}
+
+// { before: <first half>, after: <second half> } — split by count, oldest games first.
+function gcComputeHalfSplit(opp, team) {
+  const games = gcRelevantGamesSorted(opp, team);
+  const mid = Math.ceil(games.length / 2);
+  return {
+    before: gcAggregateGamesSubset(games.slice(0, mid), team),
+    after: gcAggregateGamesSubset(games.slice(mid), team),
+  };
+}
+
+// { before: <full season>, after: <most recent N games> }
+function gcComputeRecentSplit(opp, team, n = 5) {
+  const games = gcRelevantGamesSorted(opp, team);
+  return {
+    before: gcAggregateGamesSubset(games, team),
+    after: gcAggregateGamesSubset(games.slice(-n), team),
+  };
+}
+
 el("btnParseGcLog").addEventListener("click", () => {
   const opp = currentOpponent();
   if (!opp) { alert("Select or add an opponent first (top right)."); return; }
@@ -445,9 +506,11 @@ function renderGcReports() {
 
   const pitchHolder = el("gcPitchingReportHolder");
   const tendenciesHolder = el("gcTendenciesHolder");
+  const trendsHolder = el("gcTrendsHolder");
   if (!selectedTeam) {
     pitchHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its pitching staff report.</p>`;
     tendenciesHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its team tendencies.</p>`;
+    trendsHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its performance trends.</p>`;
   } else {
     const staffData = computeStaffReport(opp.gameLogs, selectedTeam);
     const teamPitchEvents = allEvents.filter(e => e.pitcherTeam === selectedTeam);
@@ -464,6 +527,10 @@ function renderGcReports() {
       ? renderTeamTendencies(selectedTeam, computeTeamTendencies(teamTotalsArray, seasonPitching, staffData.totalGames))
         + `<div style="margin-top:16px;">${renderCurrentPerformance(computeTeamCurrentPerformance(teamTotalsArray))}${renderTopPerformers(computeTopPerformers(teamTotalsArray))}</div>`
       : `<p class="hint">No data recorded yet for ${selectedTeam}.</p>`;
+
+    const halfSplit = gcComputeHalfSplit(opp, selectedTeam);
+    const recentSplit = gcComputeRecentSplit(opp, selectedTeam, 5);
+    trendsHolder.innerHTML = renderPerformanceTrends(selectedTeam, halfSplit, recentSplit);
   }
 
   teamFilter.onchange = renderGcReports;
@@ -525,6 +592,7 @@ printPanel("btnPrintCard", "gcPlayerCardHolder", "Player Card", () => !lastGcTot
 printPanel("btnPrintSwingDec", "gcSwingDecHolder", "Swing Decisions", () => !lastGcTotalsArray.length);
 printPanel("btnPrintPitching", "gcPitchingReportHolder", "Pitching Scout Report", () => !lastGcTotalsArray.length);
 printPanel("btnPrintTendencies", "gcTendenciesHolder", "Team Tendencies", () => !lastGcTotalsArray.length);
+printPanel("btnPrintTrends", "gcTrendsHolder", "Performance Trends", () => !lastGcTotalsArray.length);
 
 el("btnPrintGcReport").addEventListener("click", () => window.print());
 
