@@ -98,7 +98,11 @@
       <button id="btnUndoLastGcGame" class="btn">Undo Last Game</button>
       <span id="gcMsg" class="msg"></span>
     </div>
-    <h3>Games Imported This Season</h3>
+    <div class="row" style="align-items:center;gap:8px;">
+      <h3 style="margin:0;">Games Imported This Season</h3>
+      <button id="btnRerunGames" class="btn small" title="Re-parses every game below using the current version of this tool — picks up any new stats or fixes added since you first imported. Only works for games imported after this button was added; older games need to be re-pasted once.">↻ Re-run All Games</button>
+      <span id="gcRerunMsg" class="msg"></span>
+    </div>
     <div class="scroll-table">
       <table class="data-table" id="gcGamesTable">
         <thead><tr><th>#</th><th>Date imported</th><th>Home Team</th><th>Visitor Team</th><th>Plate appearances</th><th></th></tr></thead>

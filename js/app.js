@@ -176,6 +176,7 @@ el("btnParseGcLog").addEventListener("click", () => {
       id: "gclog_" + Date.now().toString(36) + "_" + idx,
       processedAt: new Date().toISOString(),
       homeTeamName, visitorTeamName,
+      rawText: text, // kept so this game can be re-parsed later (e.g. after an app update) without re-pasting
       events, steals, scores, outsLog, wildPitches, fieldingErrors, fieldingPutouts, pickedOff,
     });
 
@@ -216,6 +217,42 @@ el("btnUndoLastGcGame").addEventListener("click", () => {
   persist();
   renderGcGamesTable();
   renderGcReports();
+});
+
+el("btnRerunGames").addEventListener("click", () => {
+  const opp = currentOpponent();
+  if (!opp || !opp.gameLogs || !opp.gameLogs.length) {
+    el("gcRerunMsg").textContent = "No games imported yet for this opponent.";
+    return;
+  }
+
+  const rerunnable = opp.gameLogs.filter(g => g.rawText);
+  const notRerunnable = opp.gameLogs.length - rerunnable.length;
+
+  if (!rerunnable.length) {
+    el("gcRerunMsg").textContent = `None of these ${opp.gameLogs.length} game(s) can be re-run — they were imported before this feature existed and don't have their original text saved. Re-paste them if you want the latest calculations.`;
+    return;
+  }
+
+  if (!confirm(`Re-run ${rerunnable.length} game(s) using the current version of this tool? This replaces their stored stats with freshly-calculated ones — your imported-games list and any manual team-name overrides for each game stay the same.`)) return;
+
+  let reErrorLines = 0;
+  rerunnable.forEach(g => {
+    const parsed = parseGameLogText(g.rawText);
+    applyTeamNames(parsed, g.homeTeamName, g.visitorTeamName);
+    const { events, steals, scores, errors, outsLog, wildPitches, fieldingErrors, fieldingPutouts, pickedOff } = parsed;
+    Object.assign(g, { events, steals, scores, outsLog, wildPitches, fieldingErrors, fieldingPutouts, pickedOff });
+    reErrorLines += errors.length;
+  });
+
+  persist();
+  renderGcGamesTable();
+  renderGcReports();
+
+  const parts = [`Re-ran ${rerunnable.length} game(s)`];
+  if (notRerunnable) parts.push(`${notRerunnable} game(s) couldn't be re-run (imported before this feature — re-paste them for the latest calculations)`);
+  if (reErrorLines) parts.push(`${reErrorLines} line(s) skipped across the re-run games (see console)`);
+  el("gcRerunMsg").textContent = parts.join(" — ") + ".";
 });
 
 function renderGcGamesTable() {
