@@ -176,6 +176,7 @@ el("btnParseGcLog").addEventListener("click", () => {
       id: "gclog_" + Date.now().toString(36) + "_" + idx,
       processedAt: new Date().toISOString(),
       homeTeamName, visitorTeamName,
+      gameDate: parsed.detectedGameDate, // "YYYY-MM-DD" or null — year is guessed (see glogFindGameDate), editable in the games table
       rawText: text, // kept so this game can be re-parsed later (e.g. after an app update) without re-pasting
       events, steals, scores, outsLog, wildPitches, fieldingErrors, fieldingPutouts, pickedOff,
     });
@@ -261,14 +262,36 @@ function renderGcGamesTable() {
   tbody.innerHTML = "";
   if (!opp) return;
   const games = opp.gameLogs || [];
-  // Newest first, so the most recently imported games are visible without scrolling —
-  // the "#" column still shows each game's original chronological import order.
-  games.forEach((g, i) => {
+
+  // Sort by game date (most recent first) so games show up in chronological order
+  // regardless of the order they were imported in. Games with no detected/entered
+  // date (older imports, or a date the parser couldn't find) fall to the bottom,
+  // sorted among themselves by when they were imported.
+  const sorted = [...games].sort((a, b) => {
+    if (a.gameDate && b.gameDate) return b.gameDate.localeCompare(a.gameDate);
+    if (a.gameDate && !b.gameDate) return -1;
+    if (!a.gameDate && b.gameDate) return 1;
+    return new Date(b.processedAt) - new Date(a.processedAt);
+  });
+
+  sorted.forEach((g, i) => {
     const tr = document.createElement("tr");
     const d = new Date(g.processedAt);
-    tr.innerHTML = `<td>${i + 1}</td><td>${d.toLocaleString()}</td><td>${g.homeTeamName || "—"}</td><td>${g.visitorTeamName || "—"}</td><td>${g.events.length}</td>` +
+    tr.innerHTML = `<td>${i + 1}</td>` +
+      `<td><input type="date" data-edit-game-date="${g.id}" value="${g.gameDate || ""}" style="font-size:.85rem;padding:2px 4px;" /></td>` +
+      `<td>${d.toLocaleString()}</td><td>${g.homeTeamName || "—"}</td><td>${g.visitorTeamName || "—"}</td><td>${g.events.length}</td>` +
       `<td><button class="btn small danger" data-delete-game="${g.id}">Delete</button></td>`;
-    tbody.prepend(tr);
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll("[data-edit-game-date]").forEach(input => {
+    input.addEventListener("change", () => {
+      const game = opp.gameLogs.find(g => g.id === input.dataset.editGameDate);
+      if (!game) return;
+      game.gameDate = input.value || null; // clearing the field removes the date entirely
+      persist();
+      renderGcGamesTable(); // re-sort with the corrected date
+    });
   });
 
   tbody.querySelectorAll("[data-delete-game]").forEach(btn => {

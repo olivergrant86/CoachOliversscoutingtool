@@ -134,6 +134,31 @@ function glogBuildPitchSequence(lines) {
 }
 
 const GLOG_INNING_HEADER_RE = /^(Top|Bottom)\s+(\d+)\w*\s*-\s*(.+)$/;
+
+// GameChanger's page header states the game date like "Sat May 9, 1:00 PM - 2:00 PM CT" —
+// note there's no YEAR anywhere in this text. We detect month/day and default to the
+// current year, which will be wrong for a past-season game entered later — the app lets
+// this be corrected per-game since there's no way to reliably infer the real year from
+// the text alone.
+const GLOG_MONTH_MAP = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+const GLOG_GAME_DATE_RE = /\b(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\w*\s+([A-Za-z]+)\s+(\d{1,2}),/;
+
+// Returns "YYYY-MM-DD" (guessing the current year — see note above) or null if no
+// date line was found in the text.
+function glogFindGameDate(text) {
+  const m = text.match(GLOG_GAME_DATE_RE);
+  if (!m) return null;
+  const month = GLOG_MONTH_MAP[m[1].toLowerCase()];
+  if (!month) return null;
+  const day = parseInt(m[2], 10);
+  if (day < 1 || day > 31) return null;
+  const year = new Date().getFullYear();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 const GLOG_OUTS_LINE_RE = /(\d)\s+Outs?\b/;
 const GLOG_PITCHING_RE = new RegExp(`(${GLOG_NAME})\\s+pitching`, "g");
 const GLOG_SUB_PITCHER_RE = new RegExp(`(${GLOG_NAME})\\s+in for pitcher`, "g");
@@ -348,7 +373,7 @@ function parseGameLogText(text) {
     });
   });
 
-  return { events, steals, scores, errors, outsLog, wildPitches, fieldingErrors, fieldingPutouts, pickedOff, detectedHome, detectedVisitor };
+  return { events, steals, scores, errors, outsLog, wildPitches, fieldingErrors, fieldingPutouts, pickedOff, detectedHome, detectedVisitor, detectedGameDate: glogFindGameDate(text) };
 }
 
 // Stamps a resolved team NAME (not just home/visitor) onto every event/steal/score,
