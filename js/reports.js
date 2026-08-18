@@ -1553,69 +1553,60 @@ function renderPerformanceTrends(teamLabel, halfSplit, recentSplit) {
 
 const TREND_LINE_COLORS = ["#1f4e96", "#b3352c", "#2e8b57", "#c9962c", "#7b4fa0", "#2596a1", "#d9534f", "#5c6b78"];
 
-function renderPlayerTrendChart(labels, series, statLabel) {
-  if (!labels.length) return `<p class="hint">No games recorded yet.</p>`;
-  if (labels.length < 2) return `<p class="hint">Need at least 2 games to draw a trend line — only ${labels.length} recorded so far.</p>`;
-
-  const width = 900, height = 380;
-  const padL = 50, padR = 20, padT = 20, padB = 50;
+// One small, self-contained line chart for a single player — own scale, own
+// color, current value labeled right in the header. No legend needed since
+// there's nothing to cross-reference within a single-line chart.
+function renderPlayerTrendMiniChart(name, labels, values, statLabel, color) {
+  const width = 300, height = 190;
+  const padL = 38, padR = 12, padT = 14, padB = 10;
   const plotW = width - padL - padR, plotH = height - padT - padB;
 
-  const allValues = series.flatMap(s => s.values).filter(v => v != null && !Number.isNaN(v));
-  const rawMax = allValues.length ? Math.max(...allValues) : 1;
-  const yMax = Math.max(0.1, Math.ceil(rawMax * 20) / 20 + 0.05); // round up to nearest .05, plus headroom
+  const valid = values.filter(v => v != null && !Number.isNaN(v));
+  const rawMax = valid.length ? Math.max(...valid) : 1;
+  const yMax = Math.max(0.1, Math.ceil(rawMax * 20) / 20 + 0.05);
   const yMin = 0;
 
   const xFor = i => padL + (labels.length > 1 ? (i / (labels.length - 1)) * plotW : plotW / 2);
   const yFor = v => padT + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
-  // Horizontal gridlines + Y-axis labels, 5 evenly spaced steps.
-  const gridSteps = 5;
+  // Just 3 gridlines (min/mid/max) — a mini chart doesn't need a dense axis.
   let gridLines = "";
-  for (let i = 0; i <= gridSteps; i++) {
-    const v = yMin + ((yMax - yMin) * i) / gridSteps;
+  [0, 0.5, 1].forEach(frac => {
+    const v = yMin + (yMax - yMin) * frac;
     const y = yFor(v);
-    gridLines += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" stroke="#e8ecef" stroke-width="1" />`;
-    gridLines += `<text x="${padL - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--muted)">${v.toFixed(3).replace(/^0/, "")}</text>`;
-  }
-
-  // X-axis labels — thin them out if there are a lot of games, so they don't overlap.
-  const maxLabels = 10;
-  const labelStep = Math.max(1, Math.ceil(labels.length / maxLabels));
-  let xLabels = "";
-  labels.forEach((label, i) => {
-    if (i % labelStep !== 0 && i !== labels.length - 1) return;
-    const x = xFor(i);
-    xLabels += `<text x="${x.toFixed(1)}" y="${height - padB + 18}" text-anchor="middle" font-size="10" fill="var(--muted)">${label}</text>`;
+    gridLines += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" stroke="#eef1f3" stroke-width="1" />`;
+    gridLines += `<text x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--muted)">${v.toFixed(3).replace(/^0/, "")}</text>`;
   });
 
-  let lines = "", legend = "";
-  series.forEach((s, idx) => {
-    const color = TREND_LINE_COLORS[idx % TREND_LINE_COLORS.length];
-    const points = s.values.map((v, i) => `${xFor(i).toFixed(1)},${yFor(v).toFixed(1)}`).join(" ");
-    const dots = s.values.map((v, i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="3" fill="${color}"><title>${s.name} — Game ${i + 1} (${labels[i]}): ${v.toFixed(3).replace(/^0/, "")}</title></circle>`).join("");
-    lines += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.5" />` + dots;
-    legend += `
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span style="width:14px;height:3px;background:${color};display:inline-block;"></span>
-        <span style="font-size:.8rem;">${s.name}</span>
-      </div>`;
-  });
+  const points = values.map((v, i) => `${xFor(i).toFixed(1)},${yFor(v).toFixed(1)}`).join(" ");
+  const dots = values.map((v, i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="2.5" fill="${color}"><title>${name} — Game ${i + 1} (${labels[i]}): ${v.toFixed(3).replace(/^0/, "")}</title></circle>`).join("");
+
+  const current = values[values.length - 1];
+  const currentFmt = current != null ? current.toFixed(3).replace(/^0/, "") : "—";
 
   return `
-    <div>
-      <svg viewBox="0 0 ${width} ${height}" width="100%" height="380" xmlns="http://www.w3.org/2000/svg">
-        ${gridLines}
-        <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${height - padB}" stroke="#c4ccd2" stroke-width="1" />
-        <line x1="${padL}" y1="${height - padB}" x2="${width - padR}" y2="${height - padB}" stroke="#c4ccd2" stroke-width="1" />
-        ${lines}
-        ${xLabels}
-        <text x="${padL - 38}" y="${padT}" font-size="11" fill="var(--muted)">${statLabel}</text>
-      </svg>
-      <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
-        ${legend}
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);">
+        <span style="font-weight:700;font-size:.85rem;">${name}</span>
+        <span style="font-size:.85rem;color:${color};font-weight:700;">${currentFmt} ${statLabel}</span>
       </div>
+      <svg viewBox="0 0 ${width} ${height}" width="100%" height="150" xmlns="http://www.w3.org/2000/svg">
+        ${gridLines}
+        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.5" />
+        ${dots}
+      </svg>
     </div>`;
+}
+
+function renderPlayerTrendGrid(labels, series, statLabel) {
+  if (!labels.length) return `<p class="hint">No games recorded yet.</p>`;
+  if (labels.length < 2) return `<p class="hint">Need at least 2 games to draw a trend line — only ${labels.length} recorded so far.</p>`;
+
+  const cards = series.map((s, idx) =>
+    renderPlayerTrendMiniChart(s.name, labels, s.values, statLabel, TREND_LINE_COLORS[idx % TREND_LINE_COLORS.length])
+  ).join("");
+
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">${cards}</div>`;
 }
 
 function renderPlayerTrendsPanel(teamLabel, labels, series, statKey, statLabel) {
@@ -1624,7 +1615,7 @@ function renderPlayerTrendsPanel(teamLabel, labels, series, statKey, statLabel) 
     <div>
       <h2 style="margin:0 0 4px;">${teamLabel} — Player Trends</h2>
       <p class="hint" style="margin:0 0 14px;">Cumulative ${statLabel} through each game, top ${series.length} player(s) by plate appearances.</p>
-      ${renderPlayerTrendChart(labels, series, statLabel)}
+      ${renderPlayerTrendGrid(labels, series, statLabel)}
       <p class="hint" style="margin-top:10px;">
         Each point is that player's season-to-date ${statLabel} as of that game — not the game's own number, which is too
         noisy on its own to read as a trend. A flat stretch means they didn't have a plate appearance that game.
