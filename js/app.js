@@ -513,10 +513,15 @@ function renderGcReports() {
       const chartHtml = renderZoneHeatChart(events.filter(e => e.batter === pick), pick);
       const t = allTotals[pick];
       const countTableHtml = t ? renderCountTable(t.pitchCounts || {}, t.countXBH || {}, pick.toUpperCase()) : "";
+      // The zone-heat chart has a color-scale legend above its black header bar; the count
+      // table doesn't have an equivalent, so without this it sits higher. An invisible copy
+      // of that same legend markup pushes the table down by exactly the right amount to
+      // line up both black bars, regardless of how fonts render on a given screen.
+      const alignmentSpacer = `<div style="visibility:hidden;">${renderZoneHeatLegend()}</div>`;
       sprayHolder.innerHTML = `
         <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;">
           <div style="flex:0 1 480px;min-width:320px;">${chartHtml}</div>
-          <div style="flex:1 1 320px;min-width:320px;">${countTableHtml}</div>
+          <div style="flex:1 1 320px;min-width:320px;">${alignmentSpacer}${countTableHtml}</div>
         </div>`;
     } else {
       sprayHolder.innerHTML = renderSprayChartFromEvents(events, "", selectedTeam);
