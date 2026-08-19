@@ -1197,7 +1197,7 @@ function renderWorkloadTable(names, seasonPitching, staffData) {
   const totalStrikePct = pitchStrikePct(totals.strikes, totals.P);
   return `
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;">
-      <div style="background:#5c6b78;color:#fff;padding:7px 14px;font-weight:700;font-size:.78rem;display:flex;justify-content:space-between;">
+      <div style="background:var(--navy);color:#fff;padding:7px 14px;font-weight:700;font-size:.78rem;display:flex;justify-content:space-between;">
         <span>WORKLOAD &amp; DETAIL</span><span style="font-size:.62rem;color:#e3e7ea;">PITCHES · EXTRAS · DECISIONS (SAME BOARD WHEN SPACE ALLOWS)</span>
       </div>
       <div style="overflow-x:auto;">
@@ -1295,7 +1295,7 @@ function renderPitchingScoutReport(teamLabel, seasonPitching, staffData) {
       ${summaryBox("G", staffData.totalGames)}
     </div>
     <div style="border:1px solid var(--border);border-top:none;padding:16px 20px;background:#fafbfc;">
-      ${renderStaffTable(rotationNames, seasonPitching, staffData, "ROTATION", "#2e7d4f")}
+      ${renderStaffTable(rotationNames, seasonPitching, staffData, "ROTATION", "var(--navy)")}
       ${renderStaffTable(bullpenNames, seasonPitching, staffData, "BULLPEN", "var(--navy)")}
       ${renderWorkloadTable(names, seasonPitching, staffData)}
       ${renderOpponentBoxTable(names, staffData)}
