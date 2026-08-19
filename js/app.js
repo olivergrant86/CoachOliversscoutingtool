@@ -681,6 +681,55 @@ function openPrintWindow(title, subtitle, contentHtml) {
   win.onload = () => { win.focus(); win.print(); };
 }
 
+// Combines several already-rendered panels into one printable document, each
+// forced onto its own page. Sections with no content (e.g. Player Card when
+// no player is selected) get a plain placeholder instead of a blank page.
+function openPrintPacket(packetTitle, teamLabel, sections) {
+  const win = window.open("", "_blank");
+  if (!win) { alert("Your browser blocked the print window popup. Please allow popups for this site and try again."); return; }
+
+  const pages = sections.map(s => {
+    const hasContent = s.html && s.html.replace(/<[^>]*>/g, "").trim().length > 0;
+    return `
+      <section class="packet-page">
+        <h1>${s.title}${teamLabel ? " — " + teamLabel : ""}</h1>
+        ${hasContent ? s.html : `<p class="hint">Nothing to show here yet — this panel had no data or no selection when the packet was printed.</p>`}
+      </section>`;
+  }).join("");
+
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${packetTitle}</title>
+      <meta charset="UTF-8" />
+      <style>
+        body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; color: #1c2733; }
+        h1 { font-size: 1.2rem; margin: 0 0 12px; }
+        h2 { font-size: 1.05rem; }
+        table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .82rem; }
+        table.data-table th, table.data-table td { border: 1px solid #d8dee3; padding: 5px 7px; text-align: center; }
+        table.data-table th { background: #eef2f5; }
+        table.data-table td:nth-child(2) { text-align: left; }
+        .hint { color: #5c6b78; font-size: .8rem; }
+        svg { max-width: 100%; }
+        select, input { display: none; } /* pickers from a live panel don't make sense printed */
+        .packet-page { padding: 20px; page-break-after: always; break-after: page; }
+        .packet-page:last-child { page-break-after: auto; break-after: auto; }
+        @media print {
+          @page { size: landscape; margin: 12mm; }
+        }
+      </style>
+    </head>
+    <body>
+      ${pages}
+    </body>
+    </html>
+  `);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
+}
+
 function printPanel(btnId, holderId, subtitle, emptyCheck) {
   el(btnId).addEventListener("click", () => {
     const opp = currentOpponent();
@@ -699,6 +748,25 @@ printPanel("btnPrintTendencies", "gcTendenciesHolder", "Team Tendencies", () => 
 printPanel("btnPrintTrends", "gcTrendsHolder", "Performance Trends", () => !lastGcTotalsArray.length);
 
 el("btnPrintGcReport").addEventListener("click", () => window.print());
+
+el("btnPrintPacket").addEventListener("click", () => {
+  if (!lastGcTotalsArray.length) { el("gcMsg").textContent = "No games imported yet."; return; }
+  const opp = currentOpponent();
+  const teamLabel = el("gcTeamFilter").value || (opp ? opp.name : "");
+
+  const sections = [
+    { title: "Season Summary", html: el("gcHitterSummaryHolder").innerHTML },
+    { title: "Damage Report", html: el("gcDamageHolder").innerHTML },
+    { title: "Spray Chart", html: el("gcSprayChartHolder").innerHTML },
+    { title: "Player Card", html: el("gcPlayerCardHolder").innerHTML },
+    { title: "Swing Decisions", html: el("gcSwingDecHolder").innerHTML },
+    { title: "Pitching Scout Report", html: el("gcPitchingReportHolder").innerHTML },
+    { title: "Team Tendencies", html: el("gcTendenciesHolder").innerHTML },
+    { title: "Performance Trends", html: el("gcTrendsHolder").innerHTML },
+  ];
+
+  openPrintPacket(opp ? opp.name : "Duncan Demon Diamond Analytics", teamLabel, sections);
+});
 
 /* ---------- Init ---------- */
 
