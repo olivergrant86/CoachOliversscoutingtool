@@ -1284,7 +1284,7 @@ function renderPitchingScoutReport(teamLabel, seasonPitching, staffData) {
         ${rotationNames.length + bullpenNames.length} ARM${rotationNames.length + bullpenNames.length === 1 ? "" : "S"} ON BOARD
       </div>
     </div>
-    <div style="background:#16324f;display:flex;border-top:1px solid rgba(255,255,255,.1);">
+    <div style="background:var(--danger);display:flex;border-top:1px solid rgba(255,255,255,.1);">
       ${summaryBox("ERA", fmt2(pitchEra(teamER, teamOuts)))}
       ${summaryBox("WHIP", fmt2(pitchWhip(teamH, teamBB, teamOuts)))}
       ${summaryBox("K/7 IP", fmt1(pitchK7(teamK, teamOuts)))}
