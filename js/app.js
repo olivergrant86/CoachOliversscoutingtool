@@ -510,7 +510,14 @@ function renderGcReports() {
   function renderGcSpray() {
     const pick = gcSprayPicker.value;
     if (pick) {
-      sprayHolder.innerHTML = renderZoneHeatChart(events.filter(e => e.batter === pick), pick);
+      const chartHtml = renderZoneHeatChart(events.filter(e => e.batter === pick), pick);
+      const t = allTotals[pick];
+      const countTableHtml = t ? renderCountTable(t.pitchCounts || {}, t.countXBH || {}, pick.toUpperCase()) : "";
+      sprayHolder.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;">
+          <div style="flex:0 1 480px;min-width:320px;">${chartHtml}</div>
+          <div style="flex:1 1 320px;min-width:320px;">${countTableHtml}</div>
+        </div>`;
     } else {
       sprayHolder.innerHTML = renderSprayChartFromEvents(events, "", selectedTeam);
     }
