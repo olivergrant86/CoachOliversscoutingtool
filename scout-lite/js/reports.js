@@ -754,8 +754,8 @@ const PDP_BENCHMARKS = {
   obp: { label: "On-base %", desc: "How often he reaches base", min: 0.150, max: 0.550, avg: 0.350, fmt: v => v.toFixed(3).replace(/^0/, "") },
   slg: { label: "Slugging %", desc: "Damage per at-bat", min: 0.150, max: 0.750, avg: 0.420, fmt: v => v.toFixed(3).replace(/^0/, "") },
   bbk: { label: "BB : K", desc: "Walks vs. strikeouts", min: 0, max: 2.5, avg: 0.55, fmt: v => v.toFixed(2) },
-  qab: { label: "QAB %", desc: "At-bats that helped the team", min: 20, max: 80, avg: 50, fmt: v => v.toFixed(1) + "%" },
-  contact: { label: "Contact %", desc: "Hits it when he swings", min: 30, max: 100, avg: 72, fmt: v => v.toFixed(1) + "%" },
+  qab: { label: "QAB %", desc: "At-bats that helped the team", min: 20, max: 80, avg: 45, fmt: v => v.toFixed(1) + "%" },
+  contact: { label: "Contact %", desc: "Hits it when he swings", min: 30, max: 100, avg: 48, fmt: v => v.toFixed(1) + "%" },
   twoOutAvg: { label: "2-Out AVG", desc: "Batting average with 2 outs", min: 0, max: 0.600, avg: 0.250, fmt: v => v.toFixed(3).replace(/^0/, "") },
   fps: { label: "First-pitch strike %", desc: "Starts a hitter 0-1", min: 20, max: 80, avg: 58, fmt: v => v.toFixed(1) + "%" },
   strikepct: { label: "Strike %", desc: "Pitches that are strikes", min: 30, max: 80, avg: 62, fmt: v => v.toFixed(1) + "%" },
@@ -1197,7 +1197,7 @@ function renderWorkloadTable(names, seasonPitching, staffData) {
   const totalStrikePct = pitchStrikePct(totals.strikes, totals.P);
   return `
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px;">
-      <div style="background:#5c6b78;color:#fff;padding:7px 14px;font-weight:700;font-size:.78rem;display:flex;justify-content:space-between;">
+      <div style="background:var(--navy);color:#fff;padding:7px 14px;font-weight:700;font-size:.78rem;display:flex;justify-content:space-between;">
         <span>WORKLOAD &amp; DETAIL</span><span style="font-size:.62rem;color:#e3e7ea;">PITCHES · EXTRAS · DECISIONS (SAME BOARD WHEN SPACE ALLOWS)</span>
       </div>
       <div style="overflow-x:auto;">
@@ -1268,7 +1268,7 @@ function renderPitchingScoutReport(teamLabel, seasonPitching, staffData) {
     </div>`;
 
   return `
-    <div style="background:var(--navy);border-radius:8px 8px 0 0;padding:14px 20px;color:#fff;">
+    <div style="background:var(--danger);border-radius:8px 8px 0 0;padding:14px 20px;color:#fff;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div style="font-size:.62rem;letter-spacing:.08em;color:#9fd6a8;">OPPONENT IQ SCOUTING</div>
@@ -1284,7 +1284,7 @@ function renderPitchingScoutReport(teamLabel, seasonPitching, staffData) {
         ${rotationNames.length + bullpenNames.length} ARM${rotationNames.length + bullpenNames.length === 1 ? "" : "S"} ON BOARD
       </div>
     </div>
-    <div style="background:#16324f;display:flex;border-top:1px solid rgba(255,255,255,.1);">
+    <div style="background:var(--danger);display:flex;border-top:1px solid rgba(255,255,255,.1);">
       ${summaryBox("ERA", fmt2(pitchEra(teamER, teamOuts)))}
       ${summaryBox("WHIP", fmt2(pitchWhip(teamH, teamBB, teamOuts)))}
       ${summaryBox("K/7 IP", fmt1(pitchK7(teamK, teamOuts)))}
@@ -1295,7 +1295,7 @@ function renderPitchingScoutReport(teamLabel, seasonPitching, staffData) {
       ${summaryBox("G", staffData.totalGames)}
     </div>
     <div style="border:1px solid var(--border);border-top:none;padding:16px 20px;background:#fafbfc;">
-      ${renderStaffTable(rotationNames, seasonPitching, staffData, "ROTATION", "#2e7d4f")}
+      ${renderStaffTable(rotationNames, seasonPitching, staffData, "ROTATION", "var(--navy)")}
       ${renderStaffTable(bullpenNames, seasonPitching, staffData, "BULLPEN", "var(--navy)")}
       ${renderWorkloadTable(names, seasonPitching, staffData)}
       ${renderOpponentBoxTable(names, staffData)}
