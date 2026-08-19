@@ -1268,7 +1268,7 @@ function renderPitchingScoutReport(teamLabel, seasonPitching, staffData) {
     </div>`;
 
   return `
-    <div style="background:var(--navy);border-radius:8px 8px 0 0;padding:14px 20px;color:#fff;">
+    <div style="background:var(--danger);border-radius:8px 8px 0 0;padding:14px 20px;color:#fff;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div style="font-size:.62rem;letter-spacing:.08em;color:#9fd6a8;">OPPONENT IQ SCOUTING</div>
