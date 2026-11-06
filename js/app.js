@@ -444,6 +444,147 @@ let lastGcTotalsArray = [];
 let gcCardViewMode = "standard"; // "standard" | "dev" — Player Card view toggle
 let gcTrendsViewMode = "team"; // "team" | "players" — Performance Trends view toggle
 
+/* ---------- Game Day (live batter view) ----------
+ * The lineup, who's up, and the at-bat log are saved on THIS device (localStorage),
+ * not in the cloud database. That's deliberate: every save of the cloud copy
+ * re-uploads the entire season's data, which would be slow on a ball-field
+ * connection after every tap — and a stale tab could overwrite games imported
+ * elsewhere. The trade-off is that a lineup set up on a laptop won't appear on
+ * the iPad; set it up on the device you'll use at the game.
+ */
+
+let gcGdCtx = null;   // scouting data for the selected team (built by renderGcReports)
+let gcGdState = null; // lineup / who's up / log for that team
+let gcGdKey = "";     // which opponent+team gcGdState belongs to
+let gcGdUi = { editing: false, pending: null, msg: "" };
+
+function gcGdStorageKey(key) { return "diamond-gameday:" + key; }
+
+function gcGdLoad(key) {
+  try { return gdSanitizeState(JSON.parse(localStorage.getItem(gcGdStorageKey(key)))); }
+  catch (e) { return gdNewState(); }
+}
+
+function gcGdSave() {
+  try { localStorage.setItem(gcGdStorageKey(gcGdKey), JSON.stringify(gcGdState)); }
+  catch (e) { gcGdUi.msg = "Couldn't save on this device (private browsing?). Game Day still works, but it won't survive a reload."; }
+}
+
+function renderGameDay() {
+  if (!gcGdCtx || !gcGdState) return;
+  el("gcGameDayHolder").innerHTML = gdRenderPanel(gcGdCtx, gcGdState, gcGdUi);
+}
+
+function gcGdSetContext(ctx) {
+  const key = `${ctx.oppId}::${ctx.team}`;
+  if (key !== gcGdKey) {
+    gcGdKey = key;
+    gcGdState = gcGdLoad(key);
+    gcGdUi = { editing: !gdHasLineup(gcGdState), pending: null, msg: "" };
+  }
+  gcGdCtx = ctx;
+  renderGameDay();
+}
+
+function gcGdClearContext(message) {
+  gcGdCtx = null; gcGdState = null; gcGdKey = "";
+  el("gcGameDayHolder").innerHTML = `<p class="hint">${message}</p>`;
+}
+
+function gcGdScrollTop() {
+  const holder = el("gcGameDayHolder");
+  if (holder && holder.scrollIntoView) holder.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function gcGdCopyLog(btn) {
+  const text = gdLogText(gcGdState, gcGdCtx.team);
+  const original = btn.textContent;
+  const flash = msg => { btn.textContent = msg; setTimeout(() => { btn.textContent = original; }, 2500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => flash("Copied ✓"), () => flash("Copy failed — select the text instead"));
+  } else {
+    flash("Copy not supported here");
+  }
+}
+
+function gcGdAction(action, ds, btn) {
+  const st = gcGdState, ui = gcGdUi;
+  ui.msg = "";
+  let scroll = false;
+
+  switch (action) {
+    case "toggle-edit": ui.editing = !ui.editing; ui.pending = null; break;
+    case "done-edit":
+      if (!gdHasLineup(st)) { ui.msg = "Add at least one hitter to the lineup first."; break; }
+      gdEnsureCurrentFilled(st); ui.editing = false; scroll = true; break;
+    case "place":
+      if (gdPlaceInLineup(st, ds.name) === -1) ui.msg = "Couldn't add him — the lineup is full or he's already in it.";
+      break;
+    case "clear-slot": gdSetSlotName(st, parseInt(ds.i, 10), ""); break;
+    case "add-slot": if (!gdAddSlot(st)) ui.msg = `Lineups can have up to ${GD_MAX_SLOTS} spots.`; break;
+    case "remove-slot": if (!gdRemoveSlot(st)) ui.msg = `A lineup needs at least ${GD_MIN_SLOTS} spots.`; break;
+    case "select": {
+      const i = parseInt(ds.i, 10);
+      if (!st.lineup[i] || !st.lineup[i].trim()) { ui.editing = true; ui.msg = "That spot is empty — add a hitter, then tap Done."; break; }
+      gdSetCurrent(st, i); ui.pending = null; scroll = true; break;
+    }
+    case "prev": gdStep(st, -1); ui.pending = null; scroll = true; break;
+    case "next": gdStep(st, 1); ui.pending = null; scroll = true; break;
+    case "result": {
+      const r = GD_RESULT_BY_CODE[ds.code];
+      if (!r) break;
+      if (r.ball) ui.pending = r.code;                    // ask where it went before logging
+      else { gdLogResult(st, r.code, null); ui.pending = null; scroll = true; }
+      break;
+    }
+    case "loc":
+      if (ui.pending) { gdLogResult(st, ui.pending, ds.value || null); ui.pending = null; scroll = true; }
+      break;
+    case "cancel-pending": ui.pending = null; break;
+    case "undo":
+      if (!gdUndo(st)) ui.msg = "Nothing to undo yet.";
+      ui.pending = null; scroll = true; break;
+    case "new-game":
+      if (!confirm("Clear today's logged at-bats and go back to the leadoff hitter? The lineup stays.")) return;
+      gdNewGame(st); ui.pending = null; scroll = true; break;
+    case "copy-log": gcGdCopyLog(btn); return; // updates its own button, no redraw needed
+    default: return;
+  }
+
+  gcGdSave();
+  renderGameDay();
+  if (scroll) gcGdScrollTop();
+}
+
+// One listener for every Game Day button — the panel is redrawn constantly, so
+// listening on the container is simpler and safer than re-attaching to buttons.
+el("gcGameDayHolder").addEventListener("click", e => {
+  const btn = e.target.closest("[data-gd]");
+  if (!btn || !gcGdState || !gcGdCtx) return;
+  gcGdAction(btn.dataset.gd, btn.dataset, btn);
+});
+
+// Typing a name into a lineup spot. Deliberately does NOT redraw the whole editor
+// (that would drop the keyboard mid-edit on an iPad) — just tidies the input and
+// refreshes the list of players still available to tap.
+el("gcGameDayHolder").addEventListener("change", e => {
+  const input = e.target.closest("[data-gd-slot]");
+  if (!input || !gcGdState || !gcGdCtx) return;
+  const name = gdCanonicalName(gcGdCtx.roster, input.value);
+  input.value = name;
+  gdSetSlotName(gcGdState, parseInt(input.dataset.gdSlot, 10), name);
+  gcGdUi.msg = "";
+  gcGdSave();
+  const chips = el("gcGameDayHolder").querySelector(".gd-chips");
+  if (chips) chips.innerHTML = gdRenderChips(gcGdCtx, gcGdState);
+});
+
+// Jump to the top of the report area when Game Day is opened, since the tab row sits far down the page.
+document.querySelector('.gctab-btn[data-gctab="gameday"]').addEventListener("click", () => {
+  const tabs = document.querySelector(".report-tabs");
+  if (tabs && tabs.scrollIntoView) tabs.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 function renderGcTeamSnapshot(totalsArray) {
   const sum = key => totalsArray.reduce((a, t) => a + (t[key] || 0), 0);
   const box = (label, value) => `<div class="stat-box"><div class="label">${label}</div><div class="value">${value}</div></div>`;
@@ -472,6 +613,7 @@ function renderGcReports() {
     el("gcSwingDecPicker").innerHTML = `<option value="">— none —</option>`;
     el("gcSwingDecHolder").innerHTML = "";
     el("gcPitchingReportHolder").innerHTML = "";
+    gcGdClearContext("Import at least one game, then pick a team above to set up Game Day.");
     lastGcTotalsArray = [];
     return;
   }
@@ -595,6 +737,7 @@ function renderGcReports() {
     pitchHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its pitching staff report.</p>`;
     tendenciesHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its team tendencies.</p>`;
     trendsHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its performance trends.</p>`;
+    gcGdClearContext("Select a specific team from the Team filter above to set up Game Day.");
   } else {
     const staffData = computeStaffReport(opp.gameLogs, selectedTeam);
     const teamPitchEvents = allEvents.filter(e => e.pitcherTeam === selectedTeam);
@@ -611,6 +754,22 @@ function renderGcReports() {
       ? renderTeamTendencies(selectedTeam, computeTeamTendencies(teamTotalsArray, seasonPitching, staffData.totalGames))
         + `<div style="margin-top:16px;">${renderCurrentPerformance(computeTeamCurrentPerformance(teamTotalsArray))}${renderTopPerformers(computeTopPerformers(teamTotalsArray))}</div>`
       : `<p class="hint">No data recorded yet for ${selectedTeam}.</p>`;
+
+    // Game Day: the same team-filtered numbers the other panels use, indexed by player name.
+    const gdTotalsByName = {};
+    totalsArray.forEach(t => { gdTotalsByName[t.name] = t; });
+    const gdEventsByName = {};
+    events.forEach(ev => { (gdEventsByName[ev.batter] = gdEventsByName[ev.batter] || []).push(ev); });
+    const gdStealsByRunner = {};
+    allSteals.filter(st => st.team === selectedTeam).forEach(st => { (gdStealsByRunner[st.runner] = gdStealsByRunner[st.runner] || []).push(st); });
+    gcGdSetContext({
+      oppId: opp.id,
+      team: selectedTeam,
+      roster: totalsArray.filter(t => t.PA > 0).map(t => ({ name: t.name, pa: t.PA })).sort((a, b) => b.pa - a.pa),
+      totalsByName: gdTotalsByName,
+      eventsByName: gdEventsByName,
+      stealsByRunner: gdStealsByRunner,
+    });
 
     const halfSplit = gcComputeHalfSplit(opp, selectedTeam);
     const recentSplit = gcComputeRecentSplit(opp, selectedTeam, 5);
