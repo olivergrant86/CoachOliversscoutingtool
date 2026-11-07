@@ -66,6 +66,7 @@
 
 <nav class="tabs">
   <button class="tab-btn active" data-tab="gclog">Import Game Log</button>
+  <button class="tab-btn" data-tab="gameday">Game Day</button>
 </nav>
 
 <main>
@@ -138,7 +139,6 @@
       <button class="gctab-btn" data-gctab="pitching">Pitching Scout Report</button>
       <button class="gctab-btn" data-gctab="tendencies">Team Tendencies</button>
       <button class="gctab-btn" data-gctab="trends">Performance Trends</button>
-      <button class="gctab-btn" data-gctab="gameday">Game Day</button>
     </div>
 
     <div id="gctab-summary" class="rtab-panel active">
@@ -219,13 +219,20 @@
       <div id="gcTrendsHolder" style="margin-top:12px;"></div>
     </div>
 
-    <div id="gctab-gameday" class="rtab-panel">
-      <div id="gcGameDayHolder"><p class="hint">Select a specific team from the Team filter above to set up Game Day.</p></div>
-    </div>
-
     <div class="row">
       <button id="btnPrintGcReport" class="btn">Print / Save PDF</button>
       <button id="btnPrintPacket" class="btn">Print Packet</button>
+    </div>
+  </section>
+
+  <!-- GAME DAY TAB -->
+  <section id="tab-gameday" class="tab-panel">
+    <div class="row gd-teamrow">
+      <label for="gcGdTeamPicker">Team:</label>
+      <select id="gcGdTeamPicker"><option value="">— choose a team —</option></select>
+    </div>
+    <div class="gd-page">
+      <div id="gcGameDayHolder"><p class="hint">Import at least one game, then choose a team above to set up Game Day.</p></div>
     </div>
   </section>
 

@@ -475,6 +475,60 @@ function renderGameDay() {
   el("gcGameDayHolder").innerHTML = gdRenderPanel(gcGdCtx, gcGdState, gcGdUi);
 }
 
+// Every team's data for the current opponent, handed over by renderGcReports. Game Day
+// has its own team picker (this tab doesn't show the Reports team filter), so it keeps
+// the full dataset and builds the chosen team's view from it.
+let gcGdSource = null;
+let gcGdTeam = "";     // team chosen in the Game Day picker
+let gcGdTeamOpp = "";  // which opponent gcGdTeam was chosen for
+
+function gcGdTeamStorageKey(oppId) { return "diamond-gameday-team:" + oppId; }
+
+function gcGdBuildContext(source, team) {
+  const events = source.allEvents.filter(e => e.team === team);
+  const totalsArray = source.allTotalsArray.filter(t => t.team === team);
+  const totalsByName = {};
+  totalsArray.forEach(t => { totalsByName[t.name] = t; });
+  const eventsByName = {};
+  events.forEach(ev => { (eventsByName[ev.batter] = eventsByName[ev.batter] || []).push(ev); });
+  const stealsByRunner = {};
+  source.allSteals.filter(st => st.team === team).forEach(st => { (stealsByRunner[st.runner] = stealsByRunner[st.runner] || []).push(st); });
+  return {
+    oppId: source.oppId,
+    team,
+    roster: totalsArray.filter(t => t.PA > 0).map(t => ({ name: t.name, pa: t.PA })).sort((a, b) => b.pa - a.pa),
+    totalsByName, eventsByName, stealsByRunner,
+  };
+}
+
+// Rebuilds the team picker and the Game Day view from the latest data.
+function gcGdRefresh() {
+  const picker = el("gcGdTeamPicker");
+  if (!gcGdSource) {
+    picker.innerHTML = `<option value="">— choose a team —</option>`;
+    gcGdTeam = ""; gcGdTeamOpp = "";
+    gcGdClearContext("Import at least one game, then choose a team above to set up Game Day.");
+    return;
+  }
+  const src = gcGdSource;
+  if (gcGdTeamOpp !== src.oppId) { // first load, or switched opponents: restore what was last used for this one
+    gcGdTeamOpp = src.oppId;
+    try { gcGdTeam = localStorage.getItem(gcGdTeamStorageKey(src.oppId)) || ""; } catch (e) { gcGdTeam = ""; }
+  }
+  if (!src.teamNames.includes(gcGdTeam)) gcGdTeam = "";
+  picker.innerHTML = `<option value="">— choose a team —</option>` +
+    src.teamNames.map(n => `<option value="${gdEsc(n)}">${gdEsc(n)}</option>`).join("");
+  picker.value = gcGdTeam;
+  if (!gcGdTeam) { gcGdClearContext("Choose a team above to set up Game Day."); return; }
+  gcGdSetContext(gcGdBuildContext(src, gcGdTeam));
+}
+
+el("gcGdTeamPicker").addEventListener("change", () => {
+  gcGdTeam = el("gcGdTeamPicker").value;
+  try { localStorage.setItem(gcGdTeamStorageKey(gcGdTeamOpp), gcGdTeam); } catch (e) { /* remembering the team is a convenience only */ }
+  gcGdRefresh();
+});
+
 function gcGdSetContext(ctx) {
   const key = `${ctx.oppId}::${ctx.team}`;
   if (key !== gcGdKey) {
@@ -579,12 +633,6 @@ el("gcGameDayHolder").addEventListener("change", e => {
   if (chips) chips.innerHTML = gdRenderChips(gcGdCtx, gcGdState);
 });
 
-// Jump to the top of the report area when Game Day is opened, since the tab row sits far down the page.
-document.querySelector('.gctab-btn[data-gctab="gameday"]').addEventListener("click", () => {
-  const tabs = document.querySelector(".report-tabs");
-  if (tabs && tabs.scrollIntoView) tabs.scrollIntoView({ behavior: "smooth", block: "start" });
-});
-
 function renderGcTeamSnapshot(totalsArray) {
   const sum = key => totalsArray.reduce((a, t) => a + (t[key] || 0), 0);
   const box = (label, value) => `<div class="stat-box"><div class="label">${label}</div><div class="value">${value}</div></div>`;
@@ -613,7 +661,7 @@ function renderGcReports() {
     el("gcSwingDecPicker").innerHTML = `<option value="">— none —</option>`;
     el("gcSwingDecHolder").innerHTML = "";
     el("gcPitchingReportHolder").innerHTML = "";
-    gcGdClearContext("Import at least one game, then pick a team above to set up Game Day.");
+    gcGdSource = null; gcGdRefresh();
     lastGcTotalsArray = [];
     return;
   }
@@ -631,6 +679,9 @@ function renderGcReports() {
     teamNames.map(name => `<option value="${name}">${name}</option>`).join("");
   if (teamNames.includes(prevTeamSelection)) teamFilter.value = prevTeamSelection;
   const selectedTeam = teamFilter.value;
+
+  gcGdSource = { oppId: opp.id, teamNames, allTotalsArray, allEvents, allSteals };
+  gcGdRefresh();
 
   const events = selectedTeam ? allEvents.filter(e => e.team === selectedTeam) : allEvents;
   const totalsArray = (selectedTeam ? allTotalsArray.filter(t => t.team === selectedTeam) : allTotalsArray)
@@ -737,7 +788,6 @@ function renderGcReports() {
     pitchHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its pitching staff report.</p>`;
     tendenciesHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its team tendencies.</p>`;
     trendsHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its performance trends.</p>`;
-    gcGdClearContext("Select a specific team from the Team filter above to set up Game Day.");
   } else {
     const staffData = computeStaffReport(opp.gameLogs, selectedTeam);
     const teamPitchEvents = allEvents.filter(e => e.pitcherTeam === selectedTeam);
@@ -754,22 +804,6 @@ function renderGcReports() {
       ? renderTeamTendencies(selectedTeam, computeTeamTendencies(teamTotalsArray, seasonPitching, staffData.totalGames))
         + `<div style="margin-top:16px;">${renderCurrentPerformance(computeTeamCurrentPerformance(teamTotalsArray))}${renderTopPerformers(computeTopPerformers(teamTotalsArray))}</div>`
       : `<p class="hint">No data recorded yet for ${selectedTeam}.</p>`;
-
-    // Game Day: the same team-filtered numbers the other panels use, indexed by player name.
-    const gdTotalsByName = {};
-    totalsArray.forEach(t => { gdTotalsByName[t.name] = t; });
-    const gdEventsByName = {};
-    events.forEach(ev => { (gdEventsByName[ev.batter] = gdEventsByName[ev.batter] || []).push(ev); });
-    const gdStealsByRunner = {};
-    allSteals.filter(st => st.team === selectedTeam).forEach(st => { (gdStealsByRunner[st.runner] = gdStealsByRunner[st.runner] || []).push(st); });
-    gcGdSetContext({
-      oppId: opp.id,
-      team: selectedTeam,
-      roster: totalsArray.filter(t => t.PA > 0).map(t => ({ name: t.name, pa: t.PA })).sort((a, b) => b.pa - a.pa),
-      totalsByName: gdTotalsByName,
-      eventsByName: gdEventsByName,
-      stealsByRunner: gdStealsByRunner,
-    });
 
     const halfSplit = gcComputeHalfSplit(opp, selectedTeam);
     const recentSplit = gcComputeRecentSplit(opp, selectedTeam, 5);

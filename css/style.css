@@ -171,3 +171,8 @@ svg#sprayField{background:#eaf3e6; border-radius:8px;}
   .gd-name{font-size:1.6rem;}
   .gd-res{flex-basis:30%;}
 }
+
+/* Game Day as its own top-level tab */
+.gd-page{background:#fff; border:1px solid var(--border); border-radius:8px; padding:16px;}
+.gd-teamrow label{font-size:.95rem; color:var(--muted);}
+.gd-teamrow select{min-height:46px; font-size:1rem; min-width:260px;}
