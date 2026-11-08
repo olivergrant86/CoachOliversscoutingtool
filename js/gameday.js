@@ -17,19 +17,21 @@ const GD_MIN_SLOTS = 9;
 const GD_MAX_SLOTS = 12;
 
 // group drives button color; ball = true means a location question follows.
+// The ORDER matters: the button grid is 5 across, so each row of five reads as a group —
+// row 1 hits + walk, row 2 strikeouts and outs, row 3 the leftovers.
 const GD_RESULTS = [
   { code: "1B", label: "Single", short: "1B", group: "hit", ball: true },
   { code: "2B", label: "Double", short: "2B", group: "hit", ball: true },
   { code: "3B", label: "Triple", short: "3B", group: "hit", ball: true },
   { code: "HR", label: "Home Run", short: "HR", group: "hit", ball: true },
   { code: "BB", label: "Walk", short: "BB", group: "reach", ball: false },
-  { code: "HBP", label: "Hit By Pitch", short: "HBP", group: "reach", ball: false },
   { code: "Ks", label: "K Swinging", short: "K", group: "out", ball: false },
   { code: "Kl", label: "K Looking", short: "K-L", group: "out", ball: false },
   { code: "GO", label: "Ground Out", short: "GO", group: "out", ball: true },
   { code: "FO", label: "Fly Out", short: "FO", group: "out", ball: true },
   { code: "LO", label: "Line Out", short: "LO", group: "out", ball: true },
   { code: "PO", label: "Pop Out", short: "PO", group: "out", ball: true },
+  { code: "HBP", label: "Hit By Pitch", short: "HBP", group: "reach", ball: false },
   { code: "ROE", label: "Reached on Error", short: "ROE", group: "other", ball: true },
   { code: "FC", label: "Fielder's Choice", short: "FC", group: "other", ball: true },
   { code: "SAC", label: "Sacrifice", short: "SAC", group: "other", ball: true },
@@ -338,19 +340,12 @@ function gdTile(label, value) {
   return `<div class="gd-tile"><div class="gd-tile-l">${label}</div><div class="gd-tile-v">${value}</div></div>`;
 }
 
-function gdRenderHeader(ctx, state) {
+// The few buttons that live in the slim top bar (next to the team picker). The big
+// team title that used to be here is gone — the picker already says which team it is.
+function gdRenderActions(state, ui) {
   return `
-    <div class="gd-header">
-      <div>
-        <div class="gd-team">${gdEsc(ctx.team)}</div>
-        <div class="gd-sub">GAME DAY · ${state.log.length} AT-BAT${state.log.length === 1 ? "" : "S"} LOGGED</div>
-      </div>
-      <div class="gd-header-btns">
-        <button class="gd-btn" data-gd="toggle-edit">Edit Lineup</button>
-        <button class="gd-btn" data-gd="undo">Undo Last</button>
-        <button class="gd-btn danger" data-gd="new-game">New Game</button>
-      </div>
-    </div>`;
+    <button class="gd-btn small" data-gd="toggle-edit">${ui && ui.editing ? "Back to Game" : "Edit Lineup"}</button>
+    <button class="gd-btn small danger" data-gd="new-game">New Game</button>`;
 }
 
 // Tappable player chips for everyone tracked who isn't in the lineup yet. Its own
@@ -481,7 +476,7 @@ function gdRenderBatterCard(ctx, state) {
   return `
     <div class="gd-card">
       ${head}${todayBar}
-      <div style="padding:14px 20px 4px;">
+      <div class="gd-body">
         ${badges ? `<div class="gd-badges">${badges}</div>` : ""}
         ${small}
         <div class="gd-tiles">${tiles}</div>
@@ -489,10 +484,10 @@ function gdRenderBatterCard(ctx, state) {
         ${notes}
       </div>
       <div class="gd-two">
-        <div class="gd-two-a">${renderZoneHeatCard(events, name)}</div>
+        <div class="gd-two-a">${renderZoneHeatCard(events, name, { compact: true })}</div>
         <div class="gd-two-b">${renderCountTable(t.pitchCounts || {}, t.countXBH || {}, name.toUpperCase())}</div>
       </div>
-      <p class="hint" style="padding:0 20px 14px;margin:0;">Approach notes come from fixed thresholds on tracked pitches — a starting read, not a verdict. WHIFF% = share of his swings that miss entirely.</p>
+      <p class="hint gd-footnote">Notes use fixed thresholds — a starting read, not a verdict. WHIFF% = share of his swings that miss.</p>
     </div>`;
 }
 
@@ -519,7 +514,7 @@ function gdRenderActionBar(state, ui) {
     const locs = GD_LOCATIONS.map(l => `<button class="gd-res loc" data-gd="loc" data-value="${l}">${l}</button>`).join("");
     return `
       <div class="gd-actionbar">
-        <div class="gd-actionhead">${gdEsc(name)} — <strong>${gdEsc(r.label)}</strong> · where did it go?</div>
+        <div class="gd-actionhead"><span>${gdEsc(name)} — <strong>${gdEsc(r.label)}</strong> · where did it go?</span></div>
         <div class="gd-res-grid">
           ${locs}
           <button class="gd-res skip" data-gd="loc" data-value="">No location</button>
@@ -531,7 +526,10 @@ function gdRenderActionBar(state, ui) {
   const buttons = GD_RESULTS.map(r => `<button class="gd-res ${r.group}" data-gd="result" data-code="${r.code}">${r.label}</button>`).join("");
   return `
     <div class="gd-actionbar">
-      <div class="gd-actionhead">Result for <strong>${gdEsc(name)}</strong>:</div>
+      <div class="gd-actionhead">
+        <span>Result for <strong>${gdEsc(name)}</strong> <em>· ${state.log.length} logged</em></span>
+        <button class="gd-btn small" data-gd="undo">Undo Last</button>
+      </div>
       <div class="gd-res-grid">${buttons}</div>
     </div>`;
 }
@@ -544,5 +542,5 @@ function gdRenderPanel(ctx, state, ui) {
   const body = ui.editing
     ? gdRenderEditor(ctx, state)
     : `${gdRenderStrip(state)}${gdRenderBatterCard(ctx, state)}${gdRenderLog(state)}${gdRenderActionBar(state, ui)}`;
-  return `<div class="gd-root">${gdRenderHeader(ctx, state)}${msg}${body}${datalist}</div>`;
+  return `<div class="gd-root">${msg}${body}${datalist}</div>`;
 }

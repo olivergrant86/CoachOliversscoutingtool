@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<meta name="apple-mobile-web-app-title" content="Diamond Analytics" />
+<meta name="theme-color" content="#000000" />
+<link rel="apple-touch-icon" href="img/logo.png" />
 <title>Duncan Demon Diamond Analytics</title>
 <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -227,9 +233,10 @@
 
   <!-- GAME DAY TAB -->
   <section id="tab-gameday" class="tab-panel">
-    <div class="row gd-teamrow">
-      <label for="gcGdTeamPicker">Team:</label>
-      <select id="gcGdTeamPicker"><option value="">— choose a team —</option></select>
+    <div class="gd-topbar">
+      <button id="btnGdMenu" class="gd-btn small" aria-expanded="false">☰ Menu</button>
+      <select id="gcGdTeamPicker" aria-label="Team"><option value="">— choose a team —</option></select>
+      <div id="gcGdActions" class="gd-actions"></div>
     </div>
     <div class="gd-page">
       <div id="gcGameDayHolder"><p class="hint">Import at least one game, then choose a team above to set up Game Day.</p></div>

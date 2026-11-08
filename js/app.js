@@ -90,6 +90,13 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
     el("tab-" + btn.dataset.tab).classList.add("active");
+    // Game Day hides the app header + tab bar to give the hitter the whole screen; the
+    // Menu button on the Game Day top bar brings them back. Leaving Game Day restores them.
+    const onGameDay = btn.dataset.tab === "gameday";
+    document.body.classList.toggle("gd-focus", onGameDay);
+    document.body.classList.remove("gd-menu-open");
+    gcGdSyncMenuButton();
+    if (onGameDay) window.scrollTo(0, 0);
     if (btn.dataset.tab === "gclog") { renderGcGamesTable(); renderGcReports(); }
   });
 });
@@ -472,6 +479,7 @@ function gcGdSave() {
 
 function renderGameDay() {
   if (!gcGdCtx || !gcGdState) return;
+  el("gcGdActions").innerHTML = gdRenderActions(gcGdState, gcGdUi);
   el("gcGameDayHolder").innerHTML = gdRenderPanel(gcGdCtx, gcGdState, gcGdUi);
 }
 
@@ -529,6 +537,19 @@ el("gcGdTeamPicker").addEventListener("change", () => {
   gcGdRefresh();
 });
 
+function gcGdSyncMenuButton() {
+  const open = document.body.classList.contains("gd-menu-open");
+  const btn = el("btnGdMenu");
+  btn.textContent = open ? "✕ Menu" : "☰ Menu";
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+el("btnGdMenu").addEventListener("click", () => {
+  document.body.classList.toggle("gd-menu-open");
+  gcGdSyncMenuButton();
+  window.scrollTo(0, 0);
+});
+
 function gcGdSetContext(ctx) {
   const key = `${ctx.oppId}::${ctx.team}`;
   if (key !== gcGdKey) {
@@ -542,12 +563,12 @@ function gcGdSetContext(ctx) {
 
 function gcGdClearContext(message) {
   gcGdCtx = null; gcGdState = null; gcGdKey = "";
+  el("gcGdActions").innerHTML = "";
   el("gcGameDayHolder").innerHTML = `<p class="hint">${message}</p>`;
 }
 
 function gcGdScrollTop() {
-  const holder = el("gcGameDayHolder");
-  if (holder && holder.scrollIntoView) holder.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function gcGdCopyLog(btn) {
@@ -612,11 +633,13 @@ function gcGdAction(action, ds, btn) {
 
 // One listener for every Game Day button — the panel is redrawn constantly, so
 // listening on the container is simpler and safer than re-attaching to buttons.
-el("gcGameDayHolder").addEventListener("click", e => {
+function gcGdOnClick(e) {
   const btn = e.target.closest("[data-gd]");
   if (!btn || !gcGdState || !gcGdCtx) return;
   gcGdAction(btn.dataset.gd, btn.dataset, btn);
-});
+}
+el("gcGameDayHolder").addEventListener("click", gcGdOnClick);
+el("gcGdActions").addEventListener("click", gcGdOnClick);
 
 // Typing a name into a lineup spot. Deliberately does NOT redraw the whole editor
 // (that would drop the keyboard mid-edit on an iPad) — just tidies the input and

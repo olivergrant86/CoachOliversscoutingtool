@@ -81,98 +81,131 @@ svg#sprayField{background:#eaf3e6; border-radius:8px;}
   .rtab-panel{display:block !important; border:none;}
 }
 
-/* ---------- Game Day (iPad-friendly live batter view) ---------- */
-.gd-root{-webkit-tap-highlight-color:transparent;}
-.gd-header{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;}
-.gd-team{font-size:1.3rem; font-weight:800;}
-.gd-sub{font-size:.72rem; letter-spacing:.07em; color:var(--muted);}
-.gd-header-btns{display:flex; gap:8px; flex-wrap:wrap;}
-.gd-btn{
-  min-height:46px; padding:8px 16px; font-size:1rem; border:1px solid var(--border); border-radius:8px;
-  background:#fff; color:var(--text); cursor:pointer; touch-action:manipulation;
+/* ---------- Game Day (iPad-friendly live batter view) ----------
+ * Built to fit one portrait iPad screen: a slim sticky top bar, all lineup spots in one
+ * row, a compact hitter card (stats, notes, spray chart and count table together), and
+ * a short 5-across result bar pinned to the bottom. */
+:root{--gd-top-h:52px;}
+
+/* While Game Day is open, the app header and tab bar get out of the way. The Menu
+   button in the Game Day top bar (body.gd-menu-open) brings them back. */
+body.gd-focus:not(.gd-menu-open) header.topbar,
+body.gd-focus:not(.gd-menu-open) nav.tabs{display:none;}
+body.gd-focus main{padding:6px 8px 0; margin-top:0;}
+body.gd-focus footer{display:none;}
+
+.gd-topbar{
+  position:sticky; top:0; z-index:6; display:flex; align-items:center; gap:8px;
+  height:var(--gd-top-h); padding:0 2px; background:var(--bg);
 }
-.gd-btn.small{min-height:38px; padding:5px 12px; font-size:.9rem;}
+.gd-topbar select{flex:1 1 auto; min-width:0; height:40px; font-size:1rem; padding:0 8px;}
+.gd-actions{display:flex; gap:6px; flex:0 0 auto;}
+.gd-page{
+  background:#fff; border:1px solid var(--border); border-radius:8px; padding:10px;
+  /* at least a screen tall, so the result bar can sit on the bottom edge and stay put between states */
+  min-height:calc(100vh - var(--gd-top-h) - 6px); min-height:calc(100dvh - var(--gd-top-h) - 6px);
+  display:flex; flex-direction:column;
+}
+#gcGameDayHolder{flex:1; display:flex; flex-direction:column;}
+.gd-root{-webkit-tap-highlight-color:transparent; flex:1; display:flex; flex-direction:column;}
+
+.gd-btn{
+  min-height:44px; padding:6px 14px; font-size:1rem; border:1px solid var(--border); border-radius:8px;
+  background:#fff; color:var(--text); cursor:pointer; touch-action:manipulation; white-space:nowrap;
+}
+.gd-btn.small{min-height:40px; padding:4px 12px; font-size:.9rem;}
 .gd-btn.primary{background:var(--navy); color:#fff; border-color:var(--navy);}
 .gd-btn.big{min-height:54px; font-size:1.1rem; padding:10px 24px;}
 .gd-btn.danger{color:var(--danger); border-color:var(--danger);}
 .gd-btn.light{background:rgba(255,255,255,.12); color:#fff; border-color:rgba(255,255,255,.35);}
-.gd-msg{background:#fff7e0; border:1px solid #ecd48a; color:#6b5200; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:.95rem;}
+.gd-header-btns{display:flex; gap:8px; flex-wrap:nowrap;}
+.gd-msg{background:#fff7e0; border:1px solid #ecd48a; color:#6b5200; border-radius:8px; padding:8px 12px; margin-bottom:8px; font-size:.92rem;}
 .gd-row{display:flex; gap:8px; flex-wrap:wrap; margin:12px 0;}
 
 /* lineup editor */
-.gd-slots{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:8px;}
+.gd-slots{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:8px;}
 .gd-slot{display:flex; align-items:center; gap:8px;}
 .gd-slotnum{width:26px; text-align:center; font-weight:800; color:var(--muted);}
-.gd-slot input[type=text]{flex:1; min-height:46px; font-size:1rem; padding:8px 10px;}
+.gd-slot input[type=text]{flex:1; min-width:0; min-height:44px; font-size:1rem; padding:8px 10px;}
 .gd-chips-label{font-size:.72rem; letter-spacing:.07em; color:var(--muted); margin:14px 0 6px;}
 .gd-chips{display:flex; flex-wrap:wrap; gap:8px;}
 .gd-chip{
-  min-height:46px; padding:6px 14px; border:1px solid var(--border); border-radius:23px; background:#fff;
+  min-height:44px; padding:6px 14px; border:1px solid var(--border); border-radius:22px; background:#fff;
   font-size:1rem; cursor:pointer; touch-action:manipulation; display:flex; align-items:baseline; gap:8px;
 }
 .gd-chip small{color:var(--muted); font-size:.75rem;}
 
-/* lineup strip */
-.gd-strip{display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px; -webkit-overflow-scrolling:touch;}
+/* lineup strip — every spot on one row, no side-scrolling */
+.gd-strip{display:flex; gap:3px; margin-bottom:8px;}
 .gd-slotchip{
-  flex:1 0 104px; min-height:68px; border:1px solid var(--border); border-radius:8px; background:#fff; padding:6px 8px;
-  text-align:left; cursor:pointer; touch-action:manipulation; display:flex; flex-direction:column; gap:1px; color:var(--text);
+  flex:1 1 0; min-width:0; min-height:56px; border:1px solid var(--border); border-radius:6px; background:#fff;
+  padding:4px 5px; text-align:left; cursor:pointer; touch-action:manipulation; color:var(--text);
+  display:flex; flex-direction:column; gap:0; overflow:hidden;
 }
-.gd-slotchip .n{font-size:.7rem; font-weight:800; opacity:.65;}
-.gd-slotchip .nm{font-weight:700; font-size:.95rem; line-height:1.15;}
-.gd-slotchip .res{font-size:.72rem; opacity:.8; min-height:1em;}
+.gd-slotchip .n{font-size:.62rem; font-weight:800; opacity:.65;}
+.gd-slotchip .nm{font-weight:700; font-size:.76rem; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.gd-slotchip .res{font-size:.62rem; opacity:.85; min-height:1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .gd-slotchip.current{background:var(--danger); color:#fff; border-color:var(--danger);}
 .gd-slotchip.empty{background:#f4f6f8; color:var(--muted);}
 
-/* batter card */
-.gd-card{border:1px solid var(--border); border-radius:10px; overflow:hidden; background:#fff; margin-bottom:12px;}
-.gd-card-head{background:var(--navy); color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;}
-.gd-batting{font-size:.72rem; letter-spacing:.09em; color:#cfd9e2;}
-.gd-name{font-size:2rem; font-weight:800; line-height:1.1;}
-.gd-today{padding:10px 20px; background:#fff7e0; border-bottom:1px solid #ecd48a; font-size:1rem;}
-.gd-badges{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
-.gd-badge{color:#fff; font-size:.78rem; font-weight:700; padding:4px 10px; border-radius:4px;}
-.gd-warn{background:#fff7e0; border:1px solid #ecd48a; color:#6b5200; border-radius:6px; padding:8px 12px; margin-bottom:10px; font-size:.9rem;}
-.gd-tiles{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
-.gd-tile{flex:1 0 84px; border:1px solid var(--border); border-radius:8px; padding:8px 6px; text-align:center; background:#fafbfc;}
-.gd-tile-l{font-size:.68rem; letter-spacing:.06em; color:var(--muted);}
-.gd-tile-v{font-size:1.45rem; font-weight:800;}
-.gd-section-label{font-size:.72rem; letter-spacing:.08em; color:var(--muted); margin:4px 0 6px;}
-.gd-notes{margin:0 0 12px; padding-left:22px; font-size:1.05rem; line-height:1.55;}
-.gd-two{display:flex; flex-wrap:wrap; gap:16px; padding:6px 20px 14px; align-items:flex-start;}
-.gd-two-a{flex:0 1 460px; min-width:300px;}
-.gd-two-b{flex:1 1 320px; min-width:300px;}
+/* hitter card — the name bar stays pinned under the top bar while you scroll */
+.gd-card{border:1px solid var(--border); border-radius:10px; background:#fff; margin-bottom:8px;}
+.gd-card-head{
+  position:sticky; top:var(--gd-top-h); z-index:4; background:var(--navy); color:#fff; border-radius:10px 10px 0 0;
+  padding:8px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px;
+}
+.gd-batting{font-size:.66rem; letter-spacing:.09em; color:#cfd9e2;}
+.gd-name{font-size:1.5rem; font-weight:800; line-height:1.1;}
+.gd-today{padding:6px 14px; background:#fff7e0; border-bottom:1px solid #ecd48a; font-size:.92rem;}
+.gd-body{padding:8px 14px 2px;}
+.gd-badges{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;}
+.gd-badge{color:#fff; font-size:.72rem; font-weight:700; padding:3px 9px; border-radius:4px;}
+.gd-warn{background:#fff7e0; border:1px solid #ecd48a; color:#6b5200; border-radius:6px; padding:5px 10px; margin-bottom:6px; font-size:.82rem;}
+.gd-tiles{display:grid; grid-template-columns:repeat(6,1fr); gap:5px; margin-bottom:8px;}
+.gd-tile{border:1px solid var(--border); border-radius:6px; padding:4px 2px; text-align:center; background:#fafbfc;}
+.gd-tile-l{font-size:.6rem; letter-spacing:.05em; color:var(--muted);}
+.gd-tile-v{font-size:1.2rem; font-weight:800; line-height:1.15;}
+.gd-section-label{font-size:.66rem; letter-spacing:.08em; color:var(--muted); margin:2px 0 3px;}
+.gd-notes{margin:0 0 6px; padding-left:20px; font-size:.93rem; line-height:1.38;}
+.gd-two{display:flex; gap:10px; padding:4px 14px 8px; align-items:flex-start;}
+.gd-two-a{flex:0 0 40%; min-width:260px;}
+.gd-two-b{flex:1 1 0; min-width:0;}
+.gd-two-b table.data-table th, .gd-two-b table.data-table td{padding:3px 4px; font-size:.76rem;}
+.gd-footnote{padding:0 14px 6px; margin:0; font-size:.7rem; line-height:1.3;}
 
 /* game log */
-.gd-log{margin:8px 0 14px; border:1px solid var(--border); border-radius:8px; padding:8px 14px; background:#fff;}
+.gd-log{margin:6px 0 10px; border:1px solid var(--border); border-radius:8px; padding:6px 12px; background:#fff;}
 .gd-log summary{cursor:pointer; font-weight:700; min-height:32px; display:flex; align-items:center;}
 .gd-log-list{margin:8px 0; padding-left:26px; line-height:1.7;}
 
-/* result buttons — pinned to the bottom of the screen while the page scrolls */
+/* result buttons — pinned to the bottom of the screen, 5 across x 3 down */
 .gd-actionbar{
   position:sticky; bottom:0; z-index:5; background:#fff; border-top:2px solid var(--navy);
-  padding:8px 6px 10px; margin:0 -16px -16px; box-shadow:0 -4px 14px rgba(0,0,0,.12);
+  padding:5px 6px 8px; margin:auto -10px -10px; box-shadow:0 -4px 14px rgba(0,0,0,.12);
 }
-.gd-actionhead{font-size:.9rem; margin:0 8px 6px;}
-.gd-res-grid{display:flex; flex-wrap:wrap; gap:6px; padding:0 4px;}
+.gd-actionhead{display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.85rem; margin:0 4px 4px; min-height:40px;}
+.gd-actionhead em{font-style:normal; color:var(--muted);}
+.gd-res-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:5px;}
 .gd-res{
-  flex:1 1 104px; min-height:52px; border:1px solid var(--border); border-radius:8px; background:#f4f6f8;
-  font-size:.98rem; font-weight:600; cursor:pointer; touch-action:manipulation; color:var(--text);
+  min-height:44px; border:1px solid var(--border); border-radius:8px; background:#f4f6f8; padding:2px 3px;
+  font-size:.86rem; font-weight:600; line-height:1.12; cursor:pointer; touch-action:manipulation; color:var(--text);
 }
 .gd-res.hit{background:#e3f3e8; border-color:#9fd2ae;}
 .gd-res.reach{background:#e6eefb; border-color:#a9c2ea;}
 .gd-res.out{background:#eef0f2;}
 .gd-res.other{background:#fbf1dd; border-color:#e8cf95;}
-.gd-res.loc{background:#fff; border-color:var(--navy); font-size:1.1rem; font-weight:800;}
+.gd-res.loc{background:#fff; border-color:var(--navy); font-size:1.05rem; font-weight:800;}
 .gd-res.skip{background:#f4f6f8;}
 .gd-res.cancel{color:var(--danger); border-color:var(--danger); background:#fff;}
 .gd-res:active, .gd-btn:active, .gd-chip:active, .gd-slotchip:active{filter:brightness(.92);}
-@media (max-width:820px){
-  .gd-name{font-size:1.6rem;}
-  .gd-res{flex-basis:30%;}
-}
 
-/* Game Day as its own top-level tab */
-.gd-page{background:#fff; border:1px solid var(--border); border-radius:8px; padding:16px;}
-.gd-teamrow label{font-size:.95rem; color:var(--muted);}
-.gd-teamrow select{min-height:46px; font-size:1rem; min-width:260px;}
+/* wider screens (landscape): buttons fit in two rows instead of three */
+@media (min-width:1000px){
+  .gd-res-grid{grid-template-columns:repeat(8,1fr);}
+}
+/* very narrow screens (phones): stack the spray chart over the count table */
+@media (max-width:620px){
+  .gd-two{flex-wrap:wrap;}
+  .gd-two-a{flex:1 1 100%;}
+  .gd-tiles{grid-template-columns:repeat(4,1fr);}
+}

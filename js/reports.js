@@ -110,7 +110,11 @@ function renderZoneWedge(cx, cy, startDeg, endDeg, r1, r2, count, total, label) 
     <text x="${lx.toFixed(1)}" y="${(ly + 20).toFixed(1)}" text-anchor="middle" font-size="10" fill="${textColor}">${label}</text>`;
 }
 
-function renderZoneHeatCard(plays, title) {
+// opts.compact crops the empty space above the fan and tightens padding, for places
+// (like Game Day) where the chart has to share a screen. Off by default so every
+// other panel renders exactly as before.
+function renderZoneHeatCard(plays, title, opts) {
+  const compact = !!(opts && opts.compact);
   const counts = computeZoneCounts(plays);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const cx = 250, cy = 380;
@@ -135,31 +139,33 @@ function renderZoneHeatCard(plays, title) {
 
   return `
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-      <div style="background:var(--navy);color:#fff;padding:8px 14px;font-weight:600;display:flex;justify-content:space-between;">
+      <div style="background:var(--navy);color:#fff;padding:${compact ? "6px 10px" : "8px 14px"};font-weight:600;display:flex;justify-content:space-between;">
         <span>${title}</span><span>${total} BIP</span>
       </div>
-      <div style="padding:10px;">
-        <svg viewBox="0 0 500 400" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">
+      <div style="padding:${compact ? "2px 4px" : "10px"};">
+        ${compact
+          ? `<svg viewBox="0 140 500 285" width="100%" style="display:block;height:auto;" xmlns="http://www.w3.org/2000/svg">`
+          : `<svg viewBox="0 0 500 400" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">`}
           ${wedges}${plate}
         </svg>
       </div>
-      <div style="display:flex;border-top:1px solid var(--border);text-align:center;font-size:.78rem;">
-        <div style="flex:1;padding:8px;border-right:1px solid var(--border);">
+      <div style="display:flex;border-top:1px solid var(--border);text-align:center;font-size:${compact ? ".68rem" : ".78rem"};">
+        <div style="flex:1;padding:${compact ? "4px" : "8px"};border-right:1px solid var(--border);">
           <div style="color:var(--muted);">PRIMARY ZONE</div>
           <div style="color:var(--danger);font-weight:700;">${primaryZone} — ${primaryCount}</div>
           <div style="color:var(--muted);">${pct(primaryCount)} of BIP</div>
         </div>
-        <div style="flex:1;padding:8px;border-right:1px solid var(--border);">
+        <div style="flex:1;padding:${compact ? "4px" : "8px"};border-right:1px solid var(--border);">
           <div style="color:var(--muted);">OUTFIELD</div>
           <div style="font-weight:700;">${outfieldTotal} / ${total}</div>
           <div style="color:var(--muted);">${pct(outfieldTotal)}</div>
         </div>
-        <div style="flex:1;padding:8px;border-right:1px solid var(--border);">
+        <div style="flex:1;padding:${compact ? "4px" : "8px"};border-right:1px solid var(--border);">
           <div style="color:var(--muted);">INFIELD</div>
           <div style="font-weight:700;">${infieldTotal} / ${total}</div>
           <div style="color:var(--muted);">${pct(infieldTotal)}</div>
         </div>
-        <div style="flex:1;padding:8px;">
+        <div style="flex:1;padding:${compact ? "4px" : "8px"};">
           <div style="color:var(--muted);">BUNT</div>
           <div style="font-weight:700;">${buntTotal} / ${total}</div>
           <div style="color:var(--muted);">${pct(buntTotal)}</div>
