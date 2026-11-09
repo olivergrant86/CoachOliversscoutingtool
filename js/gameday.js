@@ -432,6 +432,29 @@ function gdRenderBatterCard(ctx, state, notesData) {
     notesBtn = `<button class="gd-btn small light gd-notesbtn" data-gd="notes" aria-label="Notes for ${gdEsc(name)}">Notes${savedCount ? ` · ${savedCount}` : ""}${hasDraft ? ` <span class="gd-dot">●</span>` : ""}</button>`;
   }
 
+  // "My Notes" panel — sits to the right of Approach & Tendencies so his saved notes are
+  // on screen without opening anything. Tapping it opens the full notes sheet.
+  let myNotes = "";
+  if (notesData) {
+    const saved = pnEntriesFor(notesData.saved, ctx.team, name);
+    const draft = String((notesData.drafts && notesData.drafts[name]) || "").trim();
+    const items = [];
+    if (draft) {
+      items.push(`<div class="gd-mynote draft"><div class="gd-mynote-date">UNSAVED DRAFT</div><div class="gd-mynote-text">${gdEsc(draft)}</div></div>`);
+    }
+    saved.forEach(e => {
+      items.push(`<div class="gd-mynote"><div class="gd-mynote-date">${gdEsc(pnFormatDate(e.at))}</div><div class="gd-mynote-text">${gdEsc(e.text)}</div></div>`);
+    });
+    const inner = items.length
+      ? items.join("")
+      : `<p class="hint" style="margin:0;">No notes on him yet — tap here to add one.</p>`;
+    myNotes = `
+      <div class="gd-mynotes" data-gd="notes" role="button" tabindex="0" aria-label="Open notes for ${gdEsc(name)}">
+        <div class="gd-section-label gd-mynotes-label"><span>MY NOTES${saved.length ? ` (${saved.length})` : ""}</span><span class="gd-mynotes-edit">＋ Add / edit</span></div>
+        <div class="gd-mynotes-list">${inner}</div>
+      </div>`;
+  }
+
   const head = `
     <div class="gd-card-head">
       <div>
@@ -457,6 +480,7 @@ function gdRenderBatterCard(ctx, state, notesData) {
       <div class="gd-card">${head}${todayBar}
         <div style="padding:16px 20px;">
           <p class="hint" style="margin:0;">No scouting data for "${gdEsc(name)}" yet — either this player hasn't batted in the games you've imported, or the name doesn't match how GameChanger spells it. You can still log results below.</p>
+          ${myNotes ? `<div style="margin-top:10px;">${myNotes}</div>` : ""}
         </div>
       </div>`;
   }
@@ -489,8 +513,13 @@ function gdRenderBatterCard(ctx, state, notesData) {
         ${badges ? `<div class="gd-badges">${badges}</div>` : ""}
         ${small}
         <div class="gd-tiles">${tiles}</div>
-        <div class="gd-section-label">APPROACH &amp; TENDENCIES</div>
-        ${notes}
+        <div class="gd-approach-row${myNotes ? "" : " solo"}">
+          <div class="gd-approach">
+            <div class="gd-section-label">APPROACH &amp; TENDENCIES</div>
+            ${notes}
+          </div>
+          ${myNotes}
+        </div>
       </div>
       <div class="gd-two">
         <div class="gd-two-a">${renderZoneHeatCard(events, name, { compact: true })}</div>

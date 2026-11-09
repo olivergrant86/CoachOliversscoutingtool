@@ -217,6 +217,29 @@ body.gd-focus footer{display:none;}
 .gd-btn.small.gd-notesbtn{min-height:38px; padding:2px 12px; font-size:.85rem; margin:-6px 0;}
 .gd-dot{color:#f2c14e; font-size:.8em;}
 
+/* "My Notes" panel to the right of Approach & Tendencies */
+.gd-approach-row{display:flex; gap:12px; align-items:stretch; margin-bottom:6px;}
+.gd-approach{flex:1 1 55%; min-width:0;}
+.gd-approach .gd-notes{margin-bottom:0;}
+.gd-mynotes{
+  flex:1 1 45%; min-width:0; border:1px solid #ecd48a; border-left:4px solid var(--danger); border-radius:8px;
+  background:#fffdf5; padding:6px 10px 8px; cursor:pointer; touch-action:manipulation;
+}
+.gd-mynotes:hover{background:#fff8e3;}
+.gd-mynotes:active{filter:brightness(.96);}
+.gd-mynotes-label{display:flex; justify-content:space-between; align-items:center; gap:8px; font-weight:700; color:#5c4a00;}
+.gd-mynotes-edit{font-weight:600; letter-spacing:0; font-size:.72rem; color:var(--danger);}
+.gd-mynotes-list{max-height:210px; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+.gd-mynote{padding:4px 0; border-top:1px solid #f0e3b6;}
+.gd-mynote:first-child{border-top:none; padding-top:0;}
+.gd-mynote-date{font-size:.66rem; letter-spacing:.04em; color:var(--muted);}
+.gd-mynote-text{white-space:pre-wrap; overflow-wrap:anywhere; font-size:.93rem; line-height:1.35;}
+.gd-mynote.draft .gd-mynote-date{color:#b07d00; font-weight:700;}
+.gd-mynote.draft .gd-mynote-text{font-style:italic;}
+@media (max-width:620px){
+  .gd-approach-row{flex-direction:column;}
+}
+
 /* the sheet that opens over Game Day — anchored to the top so the keyboard never covers the text box */
 .gd-sheet-backdrop{position:fixed; inset:0; z-index:30; background:rgba(0,0,0,.45);}
 .gd-sheet{
