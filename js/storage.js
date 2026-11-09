@@ -36,6 +36,24 @@ async function loadState() {
   return loaded;
 }
 
+// Like loadState(), but a failed read THROWS instead of quietly coming back as an empty
+// season. Anything that is about to write to the cloud copy should use this, so a
+// dropped connection can never be mistaken for "no data" and saved over the real thing.
+// Returns null only when the account genuinely has no saved data yet.
+async function loadStateStrict() {
+  const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+  if (userError || !user) throw new Error("Not signed in.");
+
+  const { data, error } = await supabaseClient
+    .from(SCOUTING_TABLE)
+    .select("state")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data && data.state ? data.state : null;
+}
+
 async function saveState(state) {
   const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
   if (userError || !user) throw new Error("Not signed in.");

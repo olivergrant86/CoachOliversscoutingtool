@@ -411,7 +411,7 @@ function gdRenderStrip(state) {
   return `<div class="gd-strip">${chips}</div>`;
 }
 
-function gdRenderBatterCard(ctx, state) {
+function gdRenderBatterCard(ctx, state, notesData) {
   const name = (state.lineup[state.current] || "").trim();
   if (!name) {
     return `<div class="gd-card"><div style="padding:20px;"><p class="hint" style="margin:0;">Tap a lineup spot above to see that hitter.</p></div></div>`;
@@ -423,11 +423,20 @@ function gdRenderBatterCard(ctx, state) {
   const profile = gdBatterProfile(t, events, steals);
   const today = gdTodayLine(state, name);
 
+  // Notes button (only when notes data is supplied): shows how many saved notes he has and a
+  // dot if there's an unsaved draft, so you can tell at a glance whether he has notes.
+  let notesBtn = "";
+  if (notesData) {
+    const savedCount = pnEntriesFor(notesData.saved, ctx.team, name).length;
+    const hasDraft = !!(notesData.drafts && String(notesData.drafts[name] || "").trim());
+    notesBtn = `<button class="gd-btn small light gd-notesbtn" data-gd="notes" aria-label="Notes for ${gdEsc(name)}">Notes${savedCount ? ` · ${savedCount}` : ""}${hasDraft ? ` <span class="gd-dot">●</span>` : ""}</button>`;
+  }
+
   const head = `
     <div class="gd-card-head">
       <div>
         <div class="gd-batting">BATTING ${gdOrdinal(state.current + 1).toUpperCase()}</div>
-        <div class="gd-name">${gdEsc(name)}</div>
+        <div class="gd-namerow"><div class="gd-name">${gdEsc(name)}</div>${notesBtn}</div>
       </div>
       <div class="gd-header-btns">
         <button class="gd-btn small light" data-gd="prev">◀ Prev</button>
@@ -536,11 +545,26 @@ function gdRenderActionBar(state, ui) {
 
 // ctx: { team, roster: [{name, pa}], totalsByName, eventsByName, stealsByRunner }
 // ui:  { editing, pending, msg }
-function gdRenderPanel(ctx, state, ui) {
+// notesData (optional): { saved: opp.playerNotes, drafts: { player: text } } — see notes.js.
+function gdRenderPanel(ctx, state, ui, notesData) {
   const datalist = `<datalist id="gdPlayerList">${ctx.roster.map(r => `<option value="${gdEsc(r.name)}"></option>`).join("")}</datalist>`;
   const msg = ui.msg ? `<div class="gd-msg">${gdEsc(ui.msg)}</div>` : "";
   const body = ui.editing
     ? gdRenderEditor(ctx, state)
-    : `${gdRenderStrip(state)}${gdRenderBatterCard(ctx, state)}${gdRenderLog(state)}${gdRenderActionBar(state, ui)}`;
-  return `<div class="gd-root">${msg}${body}${datalist}</div>`;
+    : `${gdRenderStrip(state)}${gdRenderBatterCard(ctx, state, notesData)}${gdRenderLog(state)}${gdRenderActionBar(state, ui)}`;
+
+  let sheet = "";
+  if (ui.notesOpen && notesData) {
+    const who = ui.notesOpen;
+    sheet = pnRenderSheet({
+      team: ctx.team,
+      player: who,
+      draft: (notesData.drafts && notesData.drafts[who]) || "",
+      saved: pnEntriesFor(notesData.saved, ctx.team, who),
+      othersCount: pnDraftPlayers(notesData.drafts).filter(n => n !== who).length,
+      status: ui.notesMsg || "",
+      busy: !!ui.notesBusy,
+    });
+  }
+  return `<div class="gd-root">${msg}${body}${datalist}${sheet}</div>`;
 }

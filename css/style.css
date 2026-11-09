@@ -209,3 +209,46 @@ body.gd-focus footer{display:none;}
   .gd-two-a{flex:1 1 100%;}
   .gd-tiles{grid-template-columns:repeat(4,1fr);}
 }
+
+/* ---------- Player notes ---------- */
+.gd-namerow{display:flex; align-items:center; gap:10px; min-width:0;}
+/* Sits beside the name without making the name bar taller: the button is a comfortable 38px,
+   but the negative margin lets it use the bar's own padding instead of adding height. */
+.gd-btn.small.gd-notesbtn{min-height:38px; padding:2px 12px; font-size:.85rem; margin:-6px 0;}
+.gd-dot{color:#f2c14e; font-size:.8em;}
+
+/* the sheet that opens over Game Day — anchored to the top so the keyboard never covers the text box */
+.gd-sheet-backdrop{position:fixed; inset:0; z-index:30; background:rgba(0,0,0,.45);}
+.gd-sheet{
+  position:fixed; z-index:31; left:12px; right:12px; top:12px; max-width:760px; margin:0 auto;
+  max-height:calc(100vh - 24px); max-height:calc(100dvh - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch;
+  background:#fff; border-radius:14px; padding:14px 16px 16px; box-shadow:0 12px 40px rgba(0,0,0,.35);
+}
+.gd-sheet-head{display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;}
+.gd-sheet-name{font-size:1.5rem; font-weight:800; line-height:1.1;}
+.gd-sheet-box{
+  width:100%; min-height:150px; font-family:inherit; font-size:1.05rem; line-height:1.4; padding:10px 12px;
+  border:1px solid var(--border); border-radius:8px; resize:vertical;
+}
+.gd-sheet-actions{margin:8px 0 4px;}
+.gd-sheet-status{font-size:.85rem; color:var(--muted); margin-bottom:8px;}
+.gd-sheet-btns{display:flex; gap:8px; flex-wrap:wrap;}
+.gd-sheet-btns .gd-btn[disabled]{opacity:.55;}
+.gd-sheet-label{font-size:.68rem; letter-spacing:.08em; color:var(--muted); margin:14px 0 6px;}
+.gd-sheet-note{border-top:1px solid var(--border); padding:8px 0;}
+.gd-sheet-date{font-size:.75rem; color:var(--muted); margin-bottom:2px;}
+.pn-text{white-space:pre-wrap; overflow-wrap:anywhere; font-size:1rem; line-height:1.4;}
+
+/* the Notes tab on the Import Game Log page */
+.pn-card{border:1px solid var(--border); border-radius:8px; background:#fff; margin-bottom:12px; overflow:hidden;}
+.pn-card-head{background:var(--navy); color:#fff; padding:8px 14px; font-weight:700; display:flex; justify-content:space-between; gap:10px;}
+.pn-count{font-weight:400; font-size:.8rem; color:#cfd9e2;}
+.pn-card-body{padding:6px 14px 10px;}
+.pn-entry{padding:8px 0; border-bottom:1px solid #eef1f3;}
+.pn-entry:last-child{border-bottom:none;}
+.pn-meta{font-size:.75rem; color:var(--muted); margin-bottom:2px;}
+.pn-actions{display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;}
+.pn-card textarea{width:100%; font-family:inherit; font-size:1rem;}
+.pn-addrow{margin:4px 0 8px;}
+.pn-unsaved{background:#fff7e0; border:1px solid #ecd48a; border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;}
+.pn-msg{background:#e6eefb; border:1px solid #a9c2ea; border-radius:8px; padding:8px 12px; margin-bottom:12px;}

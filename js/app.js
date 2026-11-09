@@ -96,7 +96,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     document.body.classList.toggle("gd-focus", onGameDay);
     document.body.classList.remove("gd-menu-open");
     gcGdSyncMenuButton();
-    if (onGameDay) window.scrollTo(0, 0);
+    if (onGameDay) { window.scrollTo(0, 0); renderGameDay(); }
     if (btn.dataset.tab === "gclog") { renderGcGamesTable(); renderGcReports(); }
   });
 });
@@ -480,7 +480,7 @@ function gcGdSave() {
 function renderGameDay() {
   if (!gcGdCtx || !gcGdState) return;
   el("gcGdActions").innerHTML = gdRenderActions(gcGdState, gcGdUi);
-  el("gcGameDayHolder").innerHTML = gdRenderPanel(gcGdCtx, gcGdState, gcGdUi);
+  el("gcGameDayHolder").innerHTML = gdRenderPanel(gcGdCtx, gcGdState, gcGdUi, { saved: gcPnSaved(), drafts: gcPnDrafts });
 }
 
 // Every team's data for the current opponent, handed over by renderGcReports. Game Day
@@ -556,6 +556,8 @@ function gcGdSetContext(ctx) {
     gcGdKey = key;
     gcGdState = gcGdLoad(key);
     gcGdUi = { editing: !gdHasLineup(gcGdState), pending: null, msg: "" };
+    gcPnDraftKey = key;
+    gcPnDrafts = gcPnLoadDrafts(key);
   }
   gcGdCtx = ctx;
   renderGameDay();
@@ -563,6 +565,7 @@ function gcGdSetContext(ctx) {
 
 function gcGdClearContext(message) {
   gcGdCtx = null; gcGdState = null; gcGdKey = "";
+  gcPnDrafts = {}; gcPnDraftKey = ""; // anything typed is already saved on this device, so nothing is lost
   el("gcGdActions").innerHTML = "";
   el("gcGameDayHolder").innerHTML = `<p class="hint">${message}</p>`;
 }
@@ -586,9 +589,18 @@ function gcGdAction(action, ds, btn) {
   const st = gcGdState, ui = gcGdUi;
   ui.msg = "";
   let scroll = false;
+  let focusNotes = false;
 
   switch (action) {
     case "toggle-edit": ui.editing = !ui.editing; ui.pending = null; break;
+    case "notes": {
+      const who = (st.lineup[st.current] || "").trim();
+      if (!who) break;
+      ui.notesOpen = who; ui.notesMsg = ""; focusNotes = true; break;
+    }
+    case "notes-close": ui.notesOpen = null; ui.notesMsg = ""; break;
+    case "notes-save-one": gcPnSaveFromGameDay([ui.notesOpen]); return;
+    case "notes-save-all": gcPnSaveFromGameDay(null); return;
     case "done-edit":
       if (!gdHasLineup(st)) { ui.msg = "Add at least one hitter to the lineup first."; break; }
       gdEnsureCurrentFilled(st); ui.editing = false; scroll = true; break;
@@ -629,6 +641,11 @@ function gcGdAction(action, ds, btn) {
   gcGdSave();
   renderGameDay();
   if (scroll) gcGdScrollTop();
+  if (focusNotes) {
+    // open with the keyboard ready so you can start typing straight away
+    const box = document.getElementById("pnDraftBox");
+    if (box) { box.focus(); try { box.setSelectionRange(box.value.length, box.value.length); } catch (e) { /* not essential */ } }
+  }
 }
 
 // One listener for every Game Day button — the panel is redrawn constantly, so
@@ -644,6 +661,13 @@ el("gcGdActions").addEventListener("click", gcGdOnClick);
 // Typing a name into a lineup spot. Deliberately does NOT redraw the whole editor
 // (that would drop the keyboard mid-edit on an iPad) — just tidies the input and
 // refreshes the list of players still available to tap.
+el("gcGameDayHolder").addEventListener("input", e => {
+  const box = e.target.closest("[data-pn-draft]");
+  if (!box || !gcGdCtx) return;
+  pnSetDraft(gcPnDrafts, box.dataset.pnDraft, box.value);
+  gcPnWriteDrafts(gcPnDraftKey, gcPnDrafts);
+});
+
 el("gcGameDayHolder").addEventListener("change", e => {
   const input = e.target.closest("[data-gd-slot]");
   if (!input || !gcGdState || !gcGdCtx) return;
@@ -654,6 +678,166 @@ el("gcGameDayHolder").addEventListener("change", e => {
   gcGdSave();
   const chips = el("gcGameDayHolder").querySelector(".gd-chips");
   if (chips) chips.innerHTML = gdRenderChips(gcGdCtx, gcGdState);
+});
+
+/* ---------- Player notes (see notes.js) ----------
+ * Two stages, on purpose:
+ *   1. DRAFTS — what you type during a game. Saved on THIS device as you type (works with no
+ *      signal, costs nothing, can't touch your season data).
+ *   2. SAVED NOTES — dated entries stored with the opponent in your cloud data, shown on the
+ *      Notes tab. A draft becomes a saved note when you tap Save.
+ * Saving never trusts this device's in-memory copy of your data. It re-reads the latest copy
+ * from the server, adds the note to THAT, and writes it back — so it can't overwrite games
+ * imported elsewhere, and if the server can't be reached it writes nothing at all.
+ */
+
+let gcPnDrafts = {};   // unsaved notes for the Game Day team: { "C Davis": "text" }
+let gcPnDraftKey = ""; // which opponent+team gcPnDrafts belongs to
+let gcPnUi = { editingId: null, msg: "", busy: false };
+let gcPnPage = null;   // { oppId, team, roster } for the Notes tab (set by renderGcReports)
+
+function gcPnDraftStorageKey(key) { return "diamond-gameday-notes:" + key; }
+
+function gcPnLoadDrafts(key) {
+  try { return pnSanitizeDrafts(JSON.parse(localStorage.getItem(gcPnDraftStorageKey(key)))); }
+  catch (e) { return {}; }
+}
+
+function gcPnWriteDrafts(key, drafts) {
+  if (!key) return;
+  try {
+    if (pnDraftPlayers(drafts).length) localStorage.setItem(gcPnDraftStorageKey(key), JSON.stringify(drafts));
+    else localStorage.removeItem(gcPnDraftStorageKey(key));
+  } catch (e) { /* drafts just won't survive a reload */ }
+}
+
+function gcPnSaved() {
+  const opp = currentOpponent();
+  return (opp && opp.playerNotes) || {};
+}
+
+function gcPnErrorText(err) {
+  if (err && err.message === "NO_OPP") return "This opponent isn't in your saved data yet, so the note couldn't be saved. Your draft is still on this device.";
+  return "Couldn't reach the server, so nothing was saved. Your notes are still safe on this device — try again when you have signal.";
+}
+
+// Re-reads the latest saved data, applies the change to it, and writes it back.
+async function gcPnCommit(oppId, mutate) {
+  const fresh = await loadStateStrict();        // throws if the server can't be reached -> nothing is written
+  const opp = fresh && fresh.opponents && fresh.opponents[oppId];
+  if (!opp) throw new Error("NO_OPP");
+  if (!opp.playerNotes || typeof opp.playerNotes !== "object") opp.playerNotes = {};
+  mutate(opp.playerNotes);
+  await saveState(fresh);
+  const mine = state.opponents[oppId];          // keep this page's copy in step
+  if (mine) mine.playerNotes = opp.playerNotes;
+}
+
+// Turns drafts into saved notes. Returns how many were saved. A draft is only cleared if it
+// hasn't changed while the save was in flight.
+async function gcPnSaveDraftsFor(oppId, team, names) {
+  const key = `${oppId}::${team}`;
+  const drafts = key === gcPnDraftKey ? gcPnDrafts : gcPnLoadDrafts(key);
+  const snapshot = {};
+  names.forEach(n => { const t = String(drafts[n] || "").trim(); if (t) snapshot[n] = t; });
+  const players = Object.keys(snapshot);
+  if (!players.length) return 0;
+  const nowIso = new Date().toISOString();
+  await gcPnCommit(oppId, notes => { players.forEach(n => pnAdd(notes, team, n, snapshot[n], nowIso, "gameday")); });
+  players.forEach(n => { if (String(drafts[n] || "").trim() === snapshot[n]) delete drafts[n]; });
+  gcPnWriteDrafts(key, drafts);
+  return players.length;
+}
+
+async function gcPnSaveFromGameDay(names) {
+  const ui = gcGdUi;
+  if (ui.notesBusy || !gcGdCtx) return;
+  const list = names || pnDraftPlayers(gcPnDrafts);
+  ui.notesBusy = true; ui.notesMsg = "Saving…"; renderGameDay();
+  try {
+    const n = await gcPnSaveDraftsFor(gcGdCtx.oppId, gcGdCtx.team, list);
+    ui.notesMsg = n ? `Saved ${n} note${n === 1 ? "" : "s"} ✓` : "Nothing to save yet — type a note first.";
+  } catch (err) {
+    ui.notesMsg = gcPnErrorText(err);
+  }
+  ui.notesBusy = false;
+  renderGameDay();
+  renderGcNotesPage();
+}
+
+/* ----- the Notes tab ----- */
+
+function renderGcNotesPage() {
+  if (!gcPnPage) return;
+  const { oppId, team, roster } = gcPnPage;
+  const key = `${oppId}::${team}`;
+  el("gcNotesHolder").innerHTML = pnRenderPage({
+    team, roster,
+    playerNotes: gcPnSaved(),
+    drafts: key === gcPnDraftKey ? gcPnDrafts : gcPnLoadDrafts(key),
+    editingId: gcPnUi.editingId, msg: gcPnUi.msg, busy: gcPnUi.busy,
+  });
+}
+
+// Runs one change against the saved notes, with a "Saving…" state. Returns true on success.
+async function gcPnRun(oppId, mutate, okMsg) {
+  gcPnUi.busy = true; gcPnUi.msg = "Saving…"; renderGcNotesPage();
+  let ok = false;
+  try {
+    await gcPnCommit(oppId, mutate);
+    gcPnUi.msg = okMsg; gcPnUi.editingId = null; ok = true;
+  } catch (err) {
+    gcPnUi.msg = gcPnErrorText(err);
+  }
+  gcPnUi.busy = false;
+  renderGcNotesPage();
+  if (ok) renderGameDay(); // keep Game Day's note counts current
+  return ok;
+}
+
+el("gcNotesHolder").addEventListener("click", async e => {
+  const btn = e.target.closest("[data-pn]");
+  if (!btn || !gcPnPage || gcPnUi.busy) return;
+  const act = btn.dataset.pn, id = btn.dataset.id;
+  const { oppId, team } = gcPnPage;
+  const field = elId => { const f = document.getElementById(elId); return f ? f.value : ""; };
+
+  if (act === "add") {
+    const player = field("pnAddPlayer"), text = field("pnAddText");
+    const keep = () => { // re-draw keeps what was typed when the save didn't go through
+      document.getElementById("pnAddPlayer").value = player;
+      document.getElementById("pnAddText").value = text;
+    };
+    if (!player) { gcPnUi.msg = "Choose a player first."; renderGcNotesPage(); keep(); return; }
+    if (!text.trim()) { gcPnUi.msg = "Write a note first."; renderGcNotesPage(); keep(); return; }
+    const ok = await gcPnRun(oppId, notes => { pnAdd(notes, team, player, text, new Date().toISOString(), "notes"); }, `Note added to ${player} ✓`);
+    if (!ok) keep();
+  } else if (act === "edit") {
+    gcPnUi.editingId = id; gcPnUi.msg = ""; renderGcNotesPage();
+  } else if (act === "cancel-edit") {
+    gcPnUi.editingId = null; gcPnUi.msg = ""; renderGcNotesPage();
+  } else if (act === "save-edit") {
+    const text = field("pnEditText");
+    if (!text.trim()) { gcPnUi.msg = "A note can't be blank — use Delete to remove it."; renderGcNotesPage(); document.getElementById("pnEditText").value = text; return; }
+    const ok = await gcPnRun(oppId, notes => { pnUpdate(notes, id, text, new Date().toISOString()); }, "Note updated ✓");
+    if (!ok && document.getElementById("pnEditText")) document.getElementById("pnEditText").value = text;
+  } else if (act === "delete") {
+    if (!confirm("Delete this note? This can't be undone.")) return;
+    await gcPnRun(oppId, notes => { pnDelete(notes, id); }, "Note deleted.");
+  } else if (act === "save-drafts") {
+    const key = `${oppId}::${team}`;
+    const names = pnDraftPlayers(key === gcPnDraftKey ? gcPnDrafts : gcPnLoadDrafts(key));
+    gcPnUi.busy = true; gcPnUi.msg = "Saving…"; renderGcNotesPage();
+    try {
+      const n = await gcPnSaveDraftsFor(oppId, team, names);
+      gcPnUi.msg = n ? `Saved ${n} note${n === 1 ? "" : "s"} ✓` : "Nothing to save.";
+    } catch (err) {
+      gcPnUi.msg = gcPnErrorText(err);
+    }
+    gcPnUi.busy = false;
+    renderGcNotesPage();
+    renderGameDay();
+  }
 });
 
 function renderGcTeamSnapshot(totalsArray) {
@@ -685,6 +869,7 @@ function renderGcReports() {
     el("gcSwingDecHolder").innerHTML = "";
     el("gcPitchingReportHolder").innerHTML = "";
     gcGdSource = null; gcGdRefresh();
+    gcPnPage = null; el("gcNotesHolder").innerHTML = `<p class="hint">Import at least one game, then pick a team to see its notes.</p>`;
     lastGcTotalsArray = [];
     return;
   }
@@ -811,6 +996,7 @@ function renderGcReports() {
     pitchHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its pitching staff report.</p>`;
     tendenciesHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its team tendencies.</p>`;
     trendsHolder.innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its performance trends.</p>`;
+    gcPnPage = null; el("gcNotesHolder").innerHTML = `<p class="hint">Select a specific team from the Team filter above to see its notes.</p>`;
   } else {
     const staffData = computeStaffReport(opp.gameLogs, selectedTeam);
     const teamPitchEvents = allEvents.filter(e => e.pitcherTeam === selectedTeam);
@@ -827,6 +1013,9 @@ function renderGcReports() {
       ? renderTeamTendencies(selectedTeam, computeTeamTendencies(teamTotalsArray, seasonPitching, staffData.totalGames))
         + `<div style="margin-top:16px;">${renderCurrentPerformance(computeTeamCurrentPerformance(teamTotalsArray))}${renderTopPerformers(computeTopPerformers(teamTotalsArray))}</div>`
       : `<p class="hint">No data recorded yet for ${selectedTeam}.</p>`;
+
+    gcPnPage = { oppId: opp.id, team: selectedTeam, roster: totalsArray.map(t => t.name) };
+    renderGcNotesPage();
 
     const halfSplit = gcComputeHalfSplit(opp, selectedTeam);
     const recentSplit = gcComputeRecentSplit(opp, selectedTeam, 5);

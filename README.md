@@ -124,5 +124,6 @@ place to adjust the regular expressions.
 ├── js/gamelog-parser.js      game log parser + all stat aggregation
 ├── js/reports.js             every report's rendering logic
 ├── js/gameday.js             Game Day live batter view: lineup/log logic + rendering
+├── js/notes.js               your own notes on players: Game Day sheet + Notes tab
 └── js/app.js                 event wiring, state, top-level render loop
 ```
