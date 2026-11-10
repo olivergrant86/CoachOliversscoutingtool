@@ -202,7 +202,7 @@ function pnRenderPage(o) {
           <div class="pn-card-head"><span>${pnEsc(g.player)}</span><span class="pn-count">${g.entries.length} note${g.entries.length === 1 ? "" : "s"}</span></div>
           <div class="pn-card-body">
             ${g.entries.map(e => {
-              const meta = `${pnEsc(pnFormatDate(e.at))}${e.source === "gameday" ? " · from Game Day" : ""}${e.editedAt ? " · edited" : ""}`;
+              const meta = `${pnEsc(pnFormatDate(e.at))}${e.source === "gameday" ? " · from Game Day" : e.source === "pitcher" ? " · from Pitcher Mode" : ""}${e.editedAt ? " · edited" : ""}`;
               if (o.editingId === e.id) {
                 return `
                   <div class="pn-entry">

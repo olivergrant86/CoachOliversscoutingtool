@@ -93,10 +93,12 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     // Game Day hides the app header + tab bar to give the hitter the whole screen; the
     // Menu button on the Game Day top bar brings them back. Leaving Game Day restores them.
     const onGameDay = btn.dataset.tab === "gameday";
-    document.body.classList.toggle("gd-focus", onGameDay);
+    const onPitcher = btn.dataset.tab === "pitcher";
+    document.body.classList.toggle("gd-focus", onGameDay || onPitcher);
     document.body.classList.remove("gd-menu-open");
     gcGdSyncMenuButton();
     if (onGameDay) { window.scrollTo(0, 0); renderGameDay(); }
+    if (onPitcher) { window.scrollTo(0, 0); renderPitcherMode(); }
     if (btn.dataset.tab === "gclog") { renderGcGamesTable(); renderGcReports(); }
   });
 });
@@ -539,9 +541,12 @@ el("gcGdTeamPicker").addEventListener("change", () => {
 
 function gcGdSyncMenuButton() {
   const open = document.body.classList.contains("gd-menu-open");
-  const btn = el("btnGdMenu");
-  btn.textContent = open ? "✕ Menu" : "☰ Menu";
-  btn.setAttribute("aria-expanded", open ? "true" : "false");
+  ["btnGdMenu", "btnPmMenu"].forEach(id => {
+    const btn = el(id);
+    if (!btn) return;
+    btn.textContent = open ? "✕ Menu" : "☰ Menu";
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
 }
 
 el("btnGdMenu").addEventListener("click", () => {
@@ -680,6 +685,152 @@ el("gcGameDayHolder").addEventListener("change", e => {
   if (chips) chips.innerHTML = gdRenderChips(gcGdCtx, gcGdState);
 });
 
+/* ---------- Pitcher Mode (see pitchermode.js) ----------
+ * Charts the opponent's pitcher live while we hit. Like Game Day, the live log is saved on
+ * THIS device only and never feeds the season stats (so a later GameChanger import of the same
+ * game can't double-count). Season numbers come from gcGdSource.gameLogs. The only cloud write
+ * is "Save today's line to his notes", which goes through the same safe path as player notes.
+ */
+let pmCtx = null, pmState = null, pmKey = "";
+let pmUi = { choosing: false, msg: "", saving: false, saveMsg: "" };
+let pmTeam = "", pmTeamOpp = "";
+
+function pmStorageKey(key) { return "diamond-pitchermode:" + key; }
+function pmTeamStorageKey(oppId) { return "diamond-pitchermode-team:" + oppId; }
+
+function pmLoad(key) {
+  try { return pmSanitizeState(JSON.parse(localStorage.getItem(pmStorageKey(key)))); }
+  catch (e) { return pmNewState(); }
+}
+function pmSave() {
+  try { localStorage.setItem(pmStorageKey(pmKey), JSON.stringify(pmState)); }
+  catch (e) { pmUi.msg = "Couldn't save on this device (private browsing?). Pitcher Mode still works, but it won't survive a reload."; }
+}
+
+function renderPitcherMode() {
+  if (!pmCtx || !pmState) return;
+  pmCtx.notes = gcPnSaved();
+  el("pmActions").innerHTML = pmRenderActions(pmState, pmUi);
+  el("pmHolder").innerHTML = pmRenderPanel(pmCtx, pmState, pmUi);
+}
+
+function pmClear(message) {
+  pmCtx = null; pmState = null; pmKey = "";
+  el("pmActions").innerHTML = "";
+  el("pmHolder").innerHTML = `<p class="hint">${message}</p>`;
+}
+
+function pmRefresh() {
+  const picker = el("pmTeamPicker");
+  if (!gcGdSource) {
+    picker.innerHTML = `<option value="">— choose a team —</option>`;
+    pmTeam = ""; pmTeamOpp = "";
+    pmClear("Import at least one game, then choose a team above to chart their pitcher.");
+    return;
+  }
+  const src = gcGdSource;
+  if (pmTeamOpp !== src.oppId) {
+    pmTeamOpp = src.oppId;
+    try { pmTeam = localStorage.getItem(pmTeamStorageKey(src.oppId)) || ""; } catch (e) { pmTeam = ""; }
+    if (!pmTeam) pmTeam = gcGdTeam; // first time: start on the same team as Game Day
+  }
+  if (!src.teamNames.includes(pmTeam)) pmTeam = "";
+  picker.innerHTML = `<option value="">— choose a team —</option>` +
+    src.teamNames.map(n => `<option value="${pmEsc(n)}">${pmEsc(n)}</option>`).join("");
+  picker.value = pmTeam;
+  if (!pmTeam) { pmClear("Choose the team that's pitching against us."); return; }
+
+  const key = `${src.oppId}::${pmTeam}`;
+  if (key !== pmKey) {
+    pmKey = key;
+    pmState = pmLoad(key);
+    pmUi = { choosing: false, msg: "", saving: false, saveMsg: "" };
+  }
+  pmCtx = { oppId: src.oppId, team: pmTeam, gameLogs: src.gameLogs || [], known: pmKnownPitchers(src.gameLogs, pmTeam) };
+  renderPitcherMode();
+}
+
+el("pmTeamPicker").addEventListener("change", () => {
+  pmTeam = el("pmTeamPicker").value;
+  try { localStorage.setItem(pmTeamStorageKey(pmTeamOpp), pmTeam); } catch (e) { /* convenience only */ }
+  pmRefresh();
+});
+
+el("btnPmMenu").addEventListener("click", () => {
+  document.body.classList.toggle("gd-menu-open");
+  gcGdSyncMenuButton();
+  window.scrollTo(0, 0);
+});
+
+async function pmSaveToNotes() {
+  const p = pmCurrent(pmState);
+  if (!p || pmUi.saving || !pmCtx) return;
+  const text = pmSummaryText(p, pmState, pmCtx.gameLogs, pmCtx.team);
+  pmUi.saving = true; pmUi.saveMsg = "Saving…"; renderPitcherMode();
+  try {
+    await gcPnCommit(pmCtx.oppId, notes => { pnAdd(notes, pmCtx.team, p.name, text, new Date().toISOString(), "pitcher"); });
+    pmUi.saveMsg = `Saved to ${p.name}'s notes ✓`;
+  } catch (err) {
+    pmUi.saveMsg = gcPnErrorText(err).replace("Your notes are still safe on this device", "Today's chart is still on this device");
+  }
+  pmUi.saving = false;
+  renderPitcherMode();
+  renderGcNotesPage();
+}
+
+function pmStartTyped() {
+  const box = document.getElementById("pmNameInput");
+  const typed = box ? box.value.trim() : "";
+  if (!typed) { pmUi.msg = "Type the pitcher's name, or tap one of the names above."; return false; }
+  // match an imported name regardless of capitalization so his season numbers line up
+  const hit = pmCtx.known.find(k => k.name.toLowerCase() === typed.toLowerCase());
+  pmStartPitcher(pmState, hit ? hit.name : typed);
+  return true;
+}
+
+function pmAction(action, ds) {
+  const st = pmState, ui = pmUi;
+  ui.msg = "";
+  if (action !== "save-notes") ui.saveMsg = "";
+  switch (action) {
+    case "pitch":
+      if (!pmLogPitch(st, ds.code)) { ui.choosing = true; ui.msg = "Pick who's pitching first."; }
+      break;
+    case "pickoff": pmPickoff(st); break;
+    case "undo": if (!pmUndo(st)) ui.msg = "Nothing to undo yet."; ui.choosing = false; break;
+    case "spot-prev": pmMoveSpot(st, -1); break;
+    case "spot-next": pmMoveSpot(st, 1); break;
+    case "next-inning": pmNextInning(st); break;
+    case "choose": ui.choosing = true; break;
+    case "cancel-choose": ui.choosing = false; break;
+    case "start": pmStartPitcher(st, ds.name); ui.choosing = false; break;
+    case "start-typed": if (pmStartTyped()) ui.choosing = false; break;
+    case "switch": {
+      const i = parseInt(ds.i, 10);
+      if (st.pitchers[i] && i !== st.cur) pmStartPitcher(st, st.pitchers[i].name);
+      break;
+    }
+    case "new-game":
+      if (!confirm("Clear today's pitch chart and start over? (Anything you saved to a pitcher's notes stays.)")) return;
+      pmNewGame(st); ui.choosing = false; break;
+    case "save-notes": pmSaveToNotes(); return;
+    default: return;
+  }
+  pmSave();
+  renderPitcherMode();
+}
+
+function pmOnClick(e) {
+  const btn = e.target.closest("[data-pm]");
+  if (!btn || btn.disabled || !pmState || !pmCtx) return;
+  pmAction(btn.dataset.pm, btn.dataset);
+}
+el("pmHolder").addEventListener("click", pmOnClick);
+el("pmActions").addEventListener("click", pmOnClick);
+el("pmHolder").addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.id === "pmNameInput") { e.preventDefault(); pmAction("start-typed", {}); }
+});
+
 /* ---------- Player notes (see notes.js) ----------
  * Two stages, on purpose:
  *   1. DRAFTS — what you type during a game. Saved on THIS device as you type (works with no
@@ -791,7 +942,7 @@ async function gcPnRun(oppId, mutate, okMsg) {
   }
   gcPnUi.busy = false;
   renderGcNotesPage();
-  if (ok) renderGameDay(); // keep Game Day's note counts current
+  if (ok) { renderGameDay(); renderPitcherMode(); } // keep note counts current
   return ok;
 }
 
@@ -868,7 +1019,7 @@ function renderGcReports() {
     el("gcSwingDecPicker").innerHTML = `<option value="">— none —</option>`;
     el("gcSwingDecHolder").innerHTML = "";
     el("gcPitchingReportHolder").innerHTML = "";
-    gcGdSource = null; gcGdRefresh();
+    gcGdSource = null; gcGdRefresh(); pmRefresh();
     gcPnPage = null; el("gcNotesHolder").innerHTML = `<p class="hint">Import at least one game, then pick a team to see its notes.</p>`;
     lastGcTotalsArray = [];
     return;
@@ -888,8 +1039,9 @@ function renderGcReports() {
   if (teamNames.includes(prevTeamSelection)) teamFilter.value = prevTeamSelection;
   const selectedTeam = teamFilter.value;
 
-  gcGdSource = { oppId: opp.id, teamNames, allTotalsArray, allEvents, allSteals };
+  gcGdSource = { oppId: opp.id, teamNames, allTotalsArray, allEvents, allSteals, gameLogs: opp.gameLogs || [] };
   gcGdRefresh();
+  pmRefresh();
 
   const events = selectedTeam ? allEvents.filter(e => e.team === selectedTeam) : allEvents;
   const totalsArray = (selectedTeam ? allTotalsArray.filter(t => t.team === selectedTeam) : allTotalsArray)
