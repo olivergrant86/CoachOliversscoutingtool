@@ -211,7 +211,7 @@ body.gd-focus footer{display:none;}
 }
 
 /* ---------- Player notes ---------- */
-.gd-namerow{display:flex; align-items:center; gap:10px; min-width:0;}
+.gd-namerow{display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:wrap; row-gap:10px;}
 /* Sits beside the name without making the name bar taller: the button is a comfortable 38px,
    but the negative margin lets it use the bar's own padding instead of adding height. */
 .gd-btn.small.gd-notesbtn{min-height:38px; padding:2px 12px; font-size:.85rem; margin:-6px 0;}

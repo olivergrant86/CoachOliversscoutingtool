@@ -640,6 +640,8 @@ function gcGdAction(action, ds, btn) {
       if (!confirm("Clear today's logged at-bats and go back to the leadoff hitter? The lineup stays.")) return;
       gdNewGame(st); ui.pending = null; scroll = true; break;
     case "copy-log": gcGdCopyLog(btn); return; // updates its own button, no redraw needed
+    case "card-positioning": printGameCardFromGameDay("positioning"); return;
+    case "card-dugout": printGameCardFromGameDay("dugout"); return;
     default: return;
   }
 
@@ -1326,14 +1328,26 @@ el("btnPrintPacket").addEventListener("click", () => {
 });
 
 /* ----- Dugout Card / Positioning Card (see cards.js) ----- */
+// From the Import Game Log tab: uses the Team filter.
 function printGameCard(kind) {
   if (!lastGcTotalsArray.length) { el("gcMsg").textContent = "No games imported yet."; return; }
-  const opp = currentOpponent();
   const team = el("gcTeamFilter").value;
   if (!team) {
     alert("Pick their team in the Team filter first (above the report tabs) — the cards are built for one team.");
     return;
   }
+  printGameCardFor(kind, currentOpponent(), team);
+}
+
+// From Game Day: uses the team picked there.
+function printGameCardFromGameDay(kind) {
+  if (!gcGdCtx) return;
+  const opp = state.opponents[gcGdCtx.oppId] || currentOpponent();
+  if (!opp) return;
+  printGameCardFor(kind, opp, gcGdCtx.team);
+}
+
+function printGameCardFor(kind, opp, team) {
   const win = window.open("", "_blank");
   if (!win) { alert("Your browser blocked the print window popup. Please allow popups for this site and try again."); return; }
   // If a Game Day lineup is set for this team on this device, the cards use that order.

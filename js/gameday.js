@@ -459,7 +459,7 @@ function gdRenderBatterCard(ctx, state, notesData) {
     <div class="gd-card-head">
       <div>
         <div class="gd-batting">BATTING ${gdOrdinal(state.current + 1).toUpperCase()}</div>
-        <div class="gd-namerow"><div class="gd-name">${gdEsc(name)}</div>${notesBtn}</div>
+        <div class="gd-namerow"><div class="gd-name">${gdEsc(name)}</div>${notesBtn}<button class="gd-btn small light gd-notesbtn" data-gd="card-positioning" aria-label="Print the Positioning Card">Positioning</button><button class="gd-btn small light gd-notesbtn" data-gd="card-dugout" aria-label="Print the Dugout Card">Dugout Card</button></div>
       </div>
       <div class="gd-header-btns">
         <button class="gd-btn small light" data-gd="prev">◀ Prev</button>
