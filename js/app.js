@@ -1325,6 +1325,32 @@ el("btnPrintPacket").addEventListener("click", () => {
   openPrintPacket(opp ? opp.name : "Duncan Demon Diamond Analytics", teamLabel, sections);
 });
 
+/* ----- Dugout Card / Positioning Card (see cards.js) ----- */
+function printGameCard(kind) {
+  if (!lastGcTotalsArray.length) { el("gcMsg").textContent = "No games imported yet."; return; }
+  const opp = currentOpponent();
+  const team = el("gcTeamFilter").value;
+  if (!team) {
+    alert("Pick their team in the Team filter first (above the report tabs) — the cards are built for one team.");
+    return;
+  }
+  const win = window.open("", "_blank");
+  if (!win) { alert("Your browser blocked the print window popup. Please allow popups for this site and try again."); return; }
+  // If a Game Day lineup is set for this team on this device, the cards use that order.
+  let gdLineup = [];
+  try { gdLineup = gcGdLoad(`${opp.id}::${team}`).lineup || []; } catch (e) { gdLineup = []; }
+  const data = cardBuildData(opp, team, gdLineup, new Date());
+  const oppName = opp ? opp.name : "";
+  const doc = kind === "dugout"
+    ? cardPrintDocument(`Dugout Card — ${team}`, cardDugoutHtml(data, oppName), true)
+    : cardPrintDocument(`Positioning Card — ${team}`, cardPositioningHtml(data, oppName), false);
+  win.document.write(doc);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
+}
+el("btnPrintDugoutCard").addEventListener("click", () => printGameCard("dugout"));
+el("btnPrintPositioningCard").addEventListener("click", () => printGameCard("positioning"));
+
 /* ---------- Init ---------- */
 
 function renderAll() {
